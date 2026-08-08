@@ -1,6 +1,6 @@
 {
   "name": "korpus-backend",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,13 +9,16 @@
     "db:migrate": "prisma migrate deploy",
     "db:seed": "node prisma/seed.js",
     "db:push": "prisma db push",
-    "db:generate": "prisma generate"
+    "db:generate": "prisma generate",
+    "import": "node src/importers/import.js",
+    "seed": "prisma db seed"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
   },
   "dependencies": {
     "@prisma/client": "^6.14.0",
+    "commander": "^13.1.0",
     "dotenv": "^16.6.1",
     "express": "^4.21.2",
     "prisma": "^6.14.0"

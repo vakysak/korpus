@@ -1,5 +1,3 @@
-// prisma/schema.prisma
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,255 +7,221 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ─── DODAVATELÉ ───────────────────────────────────────────
+// ─── DODAVATELÉ ───────────────────────────────────────────────────────────────
 
 model Supplier {
-  id    Int     @id @default(autoincrement())
-  name  String  @db.VarChar(100)
-  code  String? @db.VarChar(50)
-  email String? @db.VarChar(100)
-  note  String?
+  id       Int     @id @default(autoincrement())
+  code     String  @unique @db.VarChar(20)
+  name     String  @db.VarChar(100)
+  priority Int     @default(99)
+  active   Boolean @default(true)
+
+  createdAt DateTime @default(now())
 
   materials      Material[]
-  edges          Edge[]
   hardware       Hardware[]
-  purchaseOrders PurchaseOrder[]
-  invoices       Invoice[]
-
-  createdAt DateTime @default(now())
+  priceListItems PriceListItem[]
 }
 
-// ─── MATERIÁLY ────────────────────────────────────────────
+// ─── MATERIÁLY ────────────────────────────────────────────────────────────────
 
 model Material {
-  id         Int       @id @default(autoincrement())
-  name       String    @db.VarChar(100)
-  code       String?   @db.VarChar(50)
-  thickness  Decimal   @db.Decimal(5, 2) // mm
-  grain      Boolean   @default(false)
-  pricePerM2 Decimal?  @db.Decimal(10, 2)
-  supplier   Supplier? @relation(fields: [supplierId], references: [id])
-  supplierId Int?
-
-  orderItems OrderItem[]
-  bomItems   BomItem[]
-
-  createdAt DateTime @default(now())
-}
-
-// ─── HRANY ────────────────────────────────────────────────
-
-model Edge {
-  id         Int       @id @default(autoincrement())
-  name       String?   @db.VarChar(100)
-  code       String?   @db.VarChar(50)
-  thickness  Decimal?  @db.Decimal(4, 2) // mm
-  color      String?   @db.VarChar(50)
-  pricePerM  Decimal?  @db.Decimal(10, 2)
-  supplier   Supplier? @relation(fields: [supplierId], references: [id])
-  supplierId Int?
+  id           Int              @id @default(autoincrement())
+  supplierId   Int
+  supplierCode String           @db.VarChar(50)
+  name         String           @db.VarChar(150)
+  category     MaterialCategory
+  thickness    Decimal          @db.Decimal(6, 2)
+  widthMm      Int?
+  heightMm     Int?
+  inStock      Boolean          @default(true)
+  active       Boolean          @default(true)
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  supplier       Supplier        @relation(fields: [supplierId], references: [id])
+  priceListItems PriceListItem[]
+
+  orderItemsCorpus OrderItem[] @relation("CorpusMaterial")
+  orderItemsBack   OrderItem[] @relation("BackMaterial")
+  orderItemsFront  OrderItem[] @relation("FrontMaterial")
+
+  @@unique([supplierId, supplierCode])
 }
 
-// ─── KOVÁNÍ ───────────────────────────────────────────────
+enum MaterialCategory {
+  BOARD
+  HDF
+  EDGE
+  FRONT
+}
+
+// ─── KOVÁNÍ ───────────────────────────────────────────────────────────────────
 
 model Hardware {
   id           Int          @id @default(autoincrement())
+  supplierId   Int
+  supplierCode String       @db.VarChar(50)
+  name         String       @db.VarChar(150)
   type         HardwareType
-  name         String?      @db.VarChar(100)
-  supplierCode String?      @db.VarChar(50)
-  supplier     Supplier?    @relation(fields: [supplierId], references: [id])
-  supplierId   Int?
-  params       Json?
-  // hinge:        { overlay: "full", softClose: true, cupSize: 35 }
-  // drawerSlide:  { height: 268, length: 500, load: 30 }
-  // handleBar:    { height_mm: 32 }
-  price        Decimal?     @db.Decimal(10, 2)
-  specUrl      String?      @db.VarChar(255)
-
-  orderItems         OrderItem[]
-  purchaseOrderItems PurchaseOrderItem[]
-  invoiceItems       InvoiceItem[]
+  packQty      Int          @default(1)
+  inStock      Boolean      @default(true)
+  active       Boolean      @default(true)
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  supplier       Supplier        @relation(fields: [supplierId], references: [id])
+  priceListItems PriceListItem[]
+  bomItems       BomItem[]
+
+  @@unique([supplierId, supplierCode])
 }
 
 enum HardwareType {
-  hinge
-  tip_on
-  handle
-  handle_bar
-  drawer_slide
-  rectification_strip
-  hang_strip
+  HINGE
+  DRAWER_SLIDE
+  HANDLE
+  SHELF_PIN
+  OTHER
 }
 
-// ─── ŠABLONY SKŘÍNĚK ──────────────────────────────────────
+// ─── CENÍK ────────────────────────────────────────────────────────────────────
 
-model CabinetTemplate {
-  id      Int    @id @default(autoincrement())
-  name    String @db.VarChar(100)
-  version Int    @default(1)
-  rules   Json
-  // celá logika: díly, vzorce, podmínky kování
-
-  orderItems OrderItem[]
-  createdAt  DateTime    @default(now())
-}
-
-// ─── ZAKÁZKY ──────────────────────────────────────────────
-
-model Order {
-  id       Int         @id @default(autoincrement())
-  name     String?     @db.VarChar(100)
-  customer String?     @db.VarChar(100)
-  status   OrderStatus @default(draft)
-
-  items          OrderItem[]
-  purchaseOrders PurchaseOrder[]
+model PriceListItem {
+  id         Int       @id @default(autoincrement())
+  supplierId Int
+  materialId Int?
+  hardwareId Int?
+  unit       PriceUnit
+  price      Decimal   @db.Decimal(10, 4)
+  currency   String    @default("CZK") @db.VarChar(3)
+  validFrom  DateTime  @default(now())
+  validTo    DateTime?
 
   createdAt DateTime @default(now())
+
+  supplier Supplier  @relation(fields: [supplierId], references: [id])
+  material Material? @relation(fields: [materialId], references: [id])
+  hardware Hardware? @relation(fields: [hardwareId], references: [id])
+
+  @@index([materialId, validFrom])
+  @@index([hardwareId, validFrom])
+}
+
+enum PriceUnit {
+  M2
+  BM
+  PC
+  PACK
+}
+
+// ─── ŠABLONY ──────────────────────────────────────────────────────────────────
+
+model CabinetTemplate {
+  id      Int     @id @default(autoincrement())
+  name    String  @db.VarChar(100)
+  version Int     @default(1)
+  rules   Json
+  active  Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
+  orderItems OrderItem[]
+}
+
+// ─── ZÁKAZNÍCI ────────────────────────────────────────────────────────────────
+
+model Customer {
+  id    Int     @id @default(autoincrement())
+  name  String  @db.VarChar(150)
+  email String? @db.VarChar(150)
+  phone String? @db.VarChar(30)
+  note  String?
+
+  createdAt DateTime @default(now())
+
+  orders Order[]
+}
+
+// ─── OBJEDNÁVKY ───────────────────────────────────────────────────────────────
+
+model Order {
+  id         Int         @id @default(autoincrement())
+  customerId Int?
+  status     OrderStatus @default(DRAFT)
+  note       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  customer Customer?   @relation(fields: [customerId], references: [id])
+  items    OrderItem[]
 }
 
 enum OrderStatus {
-  draft
-  confirmed
-  in_production
-  done
-  invoiced
+  DRAFT
+  CONFIRMED
+  IN_PRODUCTION
+  DONE
+  CANCELLED
 }
 
-// ─── POLOŽKY ZAKÁZKY ──────────────────────────────────────
+// ─── POLOŽKY OBJEDNÁVKY ───────────────────────────────────────────────────────
 
 model OrderItem {
-  id         Int             @id @default(autoincrement())
-  order      Order           @relation(fields: [orderId], references: [id])
-  orderId    Int
-  template   CabinetTemplate @relation(fields: [templateId], references: [id])
-  templateId Int
-  widthMm    Int
-  heightMm   Int
-  depthMm    Int
-  material   Material        @relation(fields: [materialId], references: [id])
-  materialId Int
-  backType   BackType
-  doorType   DoorType        @default(none)
-  handle     Hardware?       @relation(fields: [handleId], references: [id])
-  handleId   Int?
-  quantity   Int             @default(1)
-  snapshotBom Json? // BOM snapshot při potvrzení zakázky
-
-  bomItems BomItem[]
+  id              Int      @id @default(autoincrement())
+  orderId         Int
+  templateId      Int
+  widthMm         Int
+  heightMm        Int
+  depthMm         Int
+  qty             Int      @default(1)
+  backType        BackType @default(OVERLAID_HDF)
+  materialId      Int
+  materialBackId  Int
+  materialFrontId Int
+  snapshotBom     Json?
 
   createdAt DateTime @default(now())
+
+  order          Order           @relation(fields: [orderId], references: [id])
+  template       CabinetTemplate @relation(fields: [templateId], references: [id])
+  materialCorpus Material        @relation("CorpusMaterial", fields: [materialId], references: [id])
+  materialBack   Material        @relation("BackMaterial", fields: [materialBackId], references: [id])
+  materialFront  Material        @relation("FrontMaterial", fields: [materialFrontId], references: [id])
+  bomItems       BomItem[]
 }
 
 enum BackType {
-  overlaid_hdf
-  half_dado_hdf
-  rectification
-  overlaid_solid
-  dado_solid
+  OVERLAID_HDF
+  HALF_DADO_HDF
 }
 
-enum DoorType {
-  none
-  handle
-  tip_on
-  handle_bar
-}
-
-// ─── KUSOVNÍK (BOM) ───────────────────────────────────────
+// ─── BOM ──────────────────────────────────────────────────────────────────────
 
 model BomItem {
-  id          Int       @id @default(autoincrement())
-  orderItem   OrderItem @relation(fields: [orderItemId], references: [id])
+  id          Int         @id @default(autoincrement())
   orderItemId Int
-  partName    String    @db.VarChar(100)
-  widthMm     Decimal   @db.Decimal(7, 2)
-  heightMm    Decimal   @db.Decimal(7, 2)
-  quantity    Int
-  material    Material  @relation(fields: [materialId], references: [id])
-  materialId  Int
-  edgeFront   Boolean   @default(false)
-  edgeBack    Boolean   @default(false)
-  edgeLeft    Boolean   @default(false)
-  edgeRight   Boolean   @default(false)
-  grain       GrainDir  @default(none)
-  note        String?
-}
-
-enum GrainDir {
-  vertical
-  horizontal
-  none
-}
-
-// ─── NÁKUPNÍ OBJEDNÁVKY ───────────────────────────────────
-
-model PurchaseOrder {
-  id         Int                 @id @default(autoincrement())
-  supplier   Supplier            @relation(fields: [supplierId], references: [id])
-  supplierId Int
-  order      Order?              @relation(fields: [orderId], references: [id])
-  orderId    Int?
-  status     PurchaseOrderStatus @default(draft)
-
-  items PurchaseOrderItem[]
+  hardwareId  Int?
+  partName    String      @db.VarChar(100)
+  partType    BomPartType
+  widthMm     Int?
+  heightMm    Int?
+  thickness   Decimal?    @db.Decimal(6, 2)
+  qty         Int         @default(1)
+  unitPrice   Decimal?    @db.Decimal(10, 4)
+  totalPrice  Decimal?    @db.Decimal(10, 4)
 
   createdAt DateTime @default(now())
+
+  orderItem OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  hardware  Hardware? @relation(fields: [hardwareId], references: [id])
 }
 
-enum PurchaseOrderStatus {
-  draft
-  sent
-  received
-  cancelled
-}
-
-model PurchaseOrderItem {
-  id              Int           @id @default(autoincrement())
-  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
-  purchaseOrderId Int
-  hardware        Hardware?     @relation(fields: [hardwareId], references: [id])
-  hardwareId      Int?
-  supplierCode    String?       @db.VarChar(50)
-  quantity        Int
-  pricePerUnit    Decimal?      @db.Decimal(10, 2)
-}
-
-// ─── FAKTURY ──────────────────────────────────────────────
-
-model Invoice {
-  id         Int           @id @default(autoincrement())
-  supplier   Supplier?     @relation(fields: [supplierId], references: [id])
-  supplierId Int?
-  scanUrl    String?       @db.VarChar(255)
-  ocrRaw     String?
-  parsedData Json?
-  status     InvoiceStatus @default(pending)
-
-  items InvoiceItem[]
-
-  createdAt DateTime @default(now())
-}
-
-enum InvoiceStatus {
-  pending
-  matched
-  confirmed
-}
-
-model InvoiceItem {
-  id           Int       @id @default(autoincrement())
-  invoice      Invoice   @relation(fields: [invoiceId], references: [id])
-  invoiceId    Int
-  supplierCode String?   @db.VarChar(50)
-  hardware     Hardware? @relation(fields: [hardwareId], references: [id])
-  hardwareId   Int? // NULL dokud nespárováno
-  nameRaw      String?   @db.VarChar(200)
-  quantity     Decimal?  @db.Decimal(10, 3)
-  pricePerUnit Decimal?  @db.Decimal(10, 2)
-  matched      Boolean   @default(false)
+enum BomPartType {
+  BOARD
+  EDGE
+  HARDWARE
 }

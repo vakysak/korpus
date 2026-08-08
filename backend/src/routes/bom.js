@@ -4,47 +4,11 @@ import { computeBom } from "../bom/engine.js";
 
 const router = Router();
 
-/**
- * Role materiálu nejsou ve schématu – mapování:
- * - corpus = OrderItem.material
- * - back   = body.materialBackId | materiál s kódem HDF-3 | thickness ≈ 3
- * - front  = body.materialFrontId | stejný jako corpus
- */
-async function resolveMaterialMap(item, body = {}) {
-  const corpus = item.material;
-  if (!corpus) {
-    throw Object.assign(new Error("Položka nemá corpus materiál (materialId)"), { status: 400 });
-  }
-
-  let back = null;
-  if (body.materialBackId) {
-    back = await prisma.material.findUnique({ where: { id: Number(body.materialBackId) } });
-  }
-  if (!back) {
-    back =
-      (await prisma.material.findFirst({ where: { code: "HDF-3" } })) ||
-      (await prisma.material.findFirst({ where: { thickness: 3 } }));
-  }
-  if (!back) {
-    throw Object.assign(new Error("Nenalezen materiál pro roli back (HDF)"), { status: 400 });
-  }
-
-  let front = corpus;
-  if (body.materialFrontId) {
-    front = await prisma.material.findUnique({ where: { id: Number(body.materialFrontId) } });
-    if (!front) {
-      throw Object.assign(new Error("materialFrontId nenalezen"), { status: 400 });
-    }
-  }
-
-  return { corpus, back, front };
-}
-
-/** POST /api/orders/:id/items – přidá skříňku do zakázky */
+/** POST /api/orders/:id/items */
 router.post("/orders/:id/items", async (req, res) => {
   const orderId = Number(req.params.id);
   const order = await prisma.order.findUnique({ where: { id: orderId } });
-  if (!order) return res.status(404).json({ error: "Objednávka nenalezena" });
+  if (!order) return res.status(404).json({ error: "Objednavka nenalezena" });
 
   const {
     templateId,
@@ -52,15 +16,15 @@ router.post("/orders/:id/items", async (req, res) => {
     heightMm,
     depthMm,
     materialId,
-    backType = "overlaid_hdf",
-    doorType = "none",
-    handleId = null,
-    quantity = 1,
+    materialBackId,
+    materialFrontId,
+    backType = "OVERLAID_HDF",
+    qty = 1,
   } = req.body ?? {};
 
-  if (!templateId || !widthMm || !heightMm || !depthMm || !materialId) {
+  if (!templateId || !widthMm || !heightMm || !depthMm || !materialId || !materialBackId || !materialFrontId) {
     return res.status(400).json({
-      error: "Vyžadováno: templateId, widthMm, heightMm, depthMm, materialId",
+      error: "Vyzadovano: templateId, widthMm, heightMm, depthMm, materialId, materialBackId, materialFrontId",
     });
   }
 
@@ -72,76 +36,91 @@ router.post("/orders/:id/items", async (req, res) => {
       heightMm: Number(heightMm),
       depthMm: Number(depthMm),
       materialId: Number(materialId),
-      backType,
-      doorType,
-      handleId: handleId != null ? Number(handleId) : null,
-      quantity: Number(quantity) || 1,
+      materialBackId: Number(materialBackId),
+      materialFrontId: Number(materialFrontId),
+      backType: String(backType).toUpperCase(),
+      qty: Number(qty) || 1,
     },
-    include: { template: true, material: true },
+    include: {
+      template: true,
+      materialCorpus: true,
+      materialBack: true,
+      materialFront: true,
+    },
   });
 
   res.status(201).json(item);
 });
 
-/**
- * POST /api/orders/:id/bom
- * body: { backType?, materialBackId?, materialFrontId?, persist?: boolean }
- */
+/** POST /api/orders/:id/bom */
 router.post("/orders/:id/bom", async (req, res) => {
-  const orderId = Number(req.params.id);
-  const body = req.body ?? {};
-  const persist = Boolean(body.persist);
-
-  const order = await prisma.order.findUnique({
-    where: { id: orderId },
-    include: {
-      items: {
-        include: { template: true, material: true },
-      },
-    },
-  });
-
-  if (!order) return res.status(404).json({ error: "Objednávka nenalezena" });
-  if (!order.items.length) {
-    return res.status(400).json({ error: "Objednávka nemá žádné položky" });
-  }
-
   try {
+    const orderId = Number(req.params.id);
+    const persist = req.body?.persist === true;
+    const backTypeOverride = req.body?.backType;
+
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        items: {
+          include: {
+            template: true,
+            materialCorpus: true,
+            materialBack: true,
+            materialFront: true,
+          },
+        },
+      },
+    });
+
+    if (!order) return res.status(404).json({ error: "Objednavka nenalezena" });
+    if (!order.items.length) return res.status(400).json({ error: "Objednavka nema polozky" });
+
     const results = [];
-
     for (const item of order.items) {
-      const materialMap = await resolveMaterialMap(item, body);
-      const backType = body.backType || item.backType || "overlaid_hdf";
-
-      const bom = computeBom(item.template, {
+      const bom = await computeBom(item.template, {
         widthMm: item.widthMm,
         heightMm: item.heightMm,
         depthMm: item.depthMm,
-        backType,
-        materialMap,
+        backType: backTypeOverride || item.backType,
+        materialMap: {
+          corpus: item.materialCorpus,
+          back: item.materialBack,
+          front: item.materialFront,
+        },
       });
 
       if (persist) {
         await prisma.bomItem.deleteMany({ where: { orderItemId: item.id } });
         await prisma.bomItem.createMany({
-          data: bom.parts.map((p) => ({
-            orderItemId: item.id,
-            partName: p.name,
-            widthMm: p.widthMm,
-            heightMm: p.heightMm,
-            quantity: p.quantity * item.quantity,
-            materialId: p.material?.id ?? item.materialId,
-            grain: "none",
-            note: null,
-          })),
+          data: [
+            ...bom.parts.map((p) => ({
+              orderItemId: item.id,
+              partName: p.partName,
+              partType: p.partType,
+              widthMm: p.widthMm,
+              heightMm: p.heightMm,
+              thickness: p.thickness,
+              qty: p.qty * item.qty,
+              unitPrice: p.unitPrice,
+              totalPrice: p.totalPrice != null ? p.totalPrice * item.qty : null,
+            })),
+            ...bom.hardware.map((h) => ({
+              orderItemId: item.id,
+              hardwareId: h.hardwareId,
+              partName: h.partName,
+              partType: "HARDWARE",
+              qty: h.qty * item.qty,
+              unitPrice: h.unitPrice,
+              totalPrice: h.totalPrice != null ? h.totalPrice * item.qty : null,
+            })),
+          ],
         });
         await prisma.orderItem.update({
           where: { id: item.id },
           data: {
             snapshotBom: {
-              parts: bom.parts,
-              hardware: bom.hardware,
-              warnings: bom.warnings,
+              ...bom,
               computedAt: new Date().toISOString(),
               templateVersion: item.template.version,
             },
@@ -152,18 +131,30 @@ router.post("/orders/:id/bom", async (req, res) => {
       results.push({
         itemId: item.id,
         templateName: item.template.name,
-        templateVersion: item.template.version,
-        dims: { widthMm: item.widthMm, heightMm: item.heightMm, depthMm: item.depthMm },
-        backType,
+        dimensions: `${item.widthMm}x${item.heightMm}x${item.depthMm}`,
         ...bom,
       });
     }
 
     res.json({ orderId, persist, bom: results });
   } catch (err) {
-    const status = err.status || 500;
-    if (status >= 500) console.error(err);
-    res.status(status).json({ error: err.message || "BOM výpočet selhal" });
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** GET /api/orders/:id/bom */
+router.get("/orders/:id/bom", async (req, res) => {
+  try {
+    const orderId = Number(req.params.id);
+    const items = await prisma.orderItem.findMany({
+      where: { orderId },
+      include: { bomItems: true, template: true },
+    });
+    if (!items.length) return res.status(404).json({ error: "Zadne polozky" });
+    res.json({ orderId, items });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

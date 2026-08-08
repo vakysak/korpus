@@ -1,38 +1,28 @@
 # Korpus
 
-Cabinet ERP (cloud-first) – https://korpus.vakysak.cz
+Cabinet ERP – https://korpus.vakysak.cz
 
 ## Stack
 
 - Backend: Node.js + Express + Prisma
-- DB: PostgreSQL (Coolify `korpus-db`)
-- Frontend: React (připravuje se)
+- DB: PostgreSQL (`korpus-db`)
+- Import: CSV pipeline (`npm run import -- --supplier=demos --file=./data/demos.csv`)
 
-## Struktura
-
-- `backend/` – API, Prisma schema, seed
-- `frontend/` – React UI
-- `db/` – odkaz na migrace
-- `docs/` – logika, vzorce, pravidla
-
-## API (v0.1)
+## API v0.3
 
 - `GET /health`
-- `GET /api/suppliers`
-- `GET /api/materials`
-- `GET /api/edges`
-- `GET /api/hardware?type=hinge`
-- `GET /api/templates`
-- `GET|POST /api/orders`
+- `GET /api/suppliers|materials|hardware|prices|templates|customers|orders`
+- `POST /api/customers`
+- `POST /api/orders`
+- `POST /api/orders/:id/items` (materialId + materialBackId + materialFrontId)
+- `POST /api/orders/:id/bom` `{ "persist": true }`
+- `GET /api/orders/:id/bom`
 
-## Lokální vývoj
+## Import
 
 ```bash
 cd backend
-cp .env.example .env
-# nastav DATABASE_URL
-npm install
-npx prisma migrate deploy
-npm run db:seed
-npm run dev
+npm run import -- --supplier=demos --file=./data/demos.csv
+npm run import -- --supplier=trust --file=./data/trust.csv
+npm run import -- --supplier=blum --file=./data/blum.csv
 ```
