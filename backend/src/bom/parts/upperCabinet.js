@@ -149,8 +149,9 @@ export async function computeUpperCabinet(input) {
   if (!frontPrice) warnings.push("Chybi cena dvirkoviny");
 
   // ── Korpus ────────────────────────────────────────────────────────────────
-  const bokW = D - Tc;
-  const bokH = H - 2 * Tc;
+  // Bok: s = D, v = H (beze zmeny)
+  const bokW = D;
+  const bokH = H;
   parts.push(
     makePart("bok", "BOARD", bokW, bokH, Tc, materialCorpus, corpusPrice, 2, {
       front: true,
@@ -158,8 +159,9 @@ export async function computeUpperCabinet(input) {
     }, "predni + dolni hrana"),
   );
 
+  // Dno / Puda: s = W - 2*Tc, v = D
   const dnoW = W - 2 * Tc;
-  const dnoH = D - Tc;
+  const dnoH = D;
   parts.push(
     makePart("dno", "BOARD", dnoW, dnoH, Tc, materialCorpus, corpusPrice, 1, { front: true }, "predni hrana"),
   );
@@ -167,6 +169,7 @@ export async function computeUpperCabinet(input) {
     makePart("puda", "BOARD", dnoW, dnoH, Tc, materialCorpus, corpusPrice, 1, { front: true }, "predni hrana"),
   );
 
+  // Police: s = W - 2*Tc, v = D - 20
   const shelves = Number(shelfCount) || 0;
   if (shelves > 0) {
     parts.push(
@@ -174,7 +177,7 @@ export async function computeUpperCabinet(input) {
         "police",
         "BOARD",
         W - 2 * Tc,
-        D - Tc - 20,
+        D - 20,
         Tc,
         materialCorpus,
         corpusPrice,
