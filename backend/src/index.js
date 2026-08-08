@@ -1,12 +1,13 @@
 import "dotenv/config";
 import express from "express";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "./db.js";
+import bomRoutes from "./routes/bom.js";
 
-const prisma = new PrismaClient();
 const app = express();
 const port = Number(process.env.PORT || 3000);
 
 app.use(express.json());
+app.use("/api", bomRoutes);
 
 app.get("/health", async (_req, res) => {
   try {
@@ -20,7 +21,7 @@ app.get("/health", async (_req, res) => {
 app.get("/", (_req, res) => {
   res.json({
     name: "Korpus API",
-    version: "0.1.0",
+    version: "0.2.0",
     docs: {
       health: "GET /health",
       suppliers: "GET /api/suppliers",
@@ -29,6 +30,8 @@ app.get("/", (_req, res) => {
       hardware: "GET /api/hardware",
       templates: "GET /api/templates",
       orders: "GET|POST /api/orders",
+      orderItems: "POST /api/orders/:id/items",
+      bom: "POST /api/orders/:id/bom",
     },
   });
 });
