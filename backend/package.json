@@ -5,9 +5,19 @@
   "type": "module",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "node --watch src/index.js"
+    "dev": "node --watch src/index.js",
+    "db:migrate": "prisma migrate deploy",
+    "db:seed": "node prisma/seed.js",
+    "db:push": "prisma db push",
+    "postinstall": "prisma generate"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
   },
   "dependencies": {
-    "express": "^4.21.2"
+    "@prisma/client": "^6.14.0",
+    "dotenv": "^16.6.1",
+    "express": "^4.21.2",
+    "prisma": "^6.14.0"
   }
 }

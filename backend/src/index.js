@@ -1,39 +1,111 @@
+import "dotenv/config";
 import express from "express";
+import { PrismaClient } from "@prisma/client";
 
+const prisma = new PrismaClient();
 const app = express();
 const port = Number(process.env.PORT || 3000);
 
-app.get("/health", (_req, res) => {
-  res.json({ ok: true, service: "korpus", domain: "vakysak.cz" });
+app.use(express.json());
+
+app.get("/health", async (_req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({ ok: true, service: "korpus", db: true });
+  } catch (err) {
+    res.status(503).json({ ok: false, service: "korpus", db: false, error: String(err.message) });
+  }
 });
 
 app.get("/", (_req, res) => {
-  res.type("html").send(`<!doctype html>
-<html lang="cs">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Korpus</title>
-  <style>
-    :root { color-scheme: light; --bg:#1c1917; --fg:#fafaf9; --accent:#c4a574; }
-    * { box-sizing: border-box; }
-    body { margin:0; min-height:100vh; display:grid; place-items:center;
-      font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
-      background: radial-gradient(1200px 600px at 20% 0%, #3f3a34 0%, var(--bg) 55%);
-      color: var(--fg); }
-    main { text-align:center; padding:2rem; }
-    h1 { font-size: clamp(3rem, 10vw, 5.5rem); letter-spacing:0.04em; margin:0 0 0.4rem; font-weight:600; }
-    p { margin:0; opacity:0.8; font-size:1.1rem; }
-    .dot { color: var(--accent); }
-  </style>
-</head>
-<body>
-  <main>
-    <h1>Korpus<span class="dot">.</span></h1>
-    <p>Cabinet ERP — vakysak.cz</p>
-  </main>
-</body>
-</html>`);
+  res.json({
+    name: "Korpus API",
+    version: "0.1.0",
+    docs: {
+      health: "GET /health",
+      suppliers: "GET /api/suppliers",
+      materials: "GET /api/materials",
+      edges: "GET /api/edges",
+      hardware: "GET /api/hardware",
+      templates: "GET /api/templates",
+      orders: "GET|POST /api/orders",
+    },
+  });
+});
+
+app.get("/api/suppliers", async (_req, res) => {
+  const data = await prisma.supplier.findMany({ orderBy: { name: "asc" } });
+  res.json(data);
+});
+
+app.get("/api/materials", async (_req, res) => {
+  const data = await prisma.material.findMany({
+    include: { supplier: true },
+    orderBy: { name: "asc" },
+  });
+  res.json(data);
+});
+
+app.get("/api/edges", async (_req, res) => {
+  const data = await prisma.edge.findMany({
+    include: { supplier: true },
+    orderBy: { name: "asc" },
+  });
+  res.json(data);
+});
+
+app.get("/api/hardware", async (req, res) => {
+  const where = req.query.type ? { type: String(req.query.type) } : {};
+  const data = await prisma.hardware.findMany({
+    where,
+    include: { supplier: true },
+    orderBy: [{ type: "asc" }, { name: "asc" }],
+  });
+  res.json(data);
+});
+
+app.get("/api/templates", async (_req, res) => {
+  const data = await prisma.cabinetTemplate.findMany({ orderBy: { name: "asc" } });
+  res.json(data);
+});
+
+app.get("/api/orders", async (_req, res) => {
+  const data = await prisma.order.findMany({
+    include: { items: true },
+    orderBy: { createdAt: "desc" },
+  });
+  res.json(data);
+});
+
+app.post("/api/orders", async (req, res) => {
+  const { name, customer, status } = req.body ?? {};
+  const data = await prisma.order.create({
+    data: {
+      name: name ?? null,
+      customer: customer ?? null,
+      status: status ?? "draft",
+    },
+  });
+  res.status(201).json(data);
+});
+
+app.get("/api/orders/:id", async (req, res) => {
+  const id = Number(req.params.id);
+  const data = await prisma.order.findUnique({
+    where: { id },
+    include: {
+      items: {
+        include: { template: true, material: true, handle: true, bomItems: true },
+      },
+    },
+  });
+  if (!data) return res.status(404).json({ error: "Order not found" });
+  res.json(data);
+});
+
+app.use((err, _req, res, _next) => {
+  console.error(err);
+  res.status(500).json({ error: "Internal server error" });
 });
 
 app.listen(port, "0.0.0.0", () => {

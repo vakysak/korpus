@@ -1,0 +1,263 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── DODAVATELÉ ───────────────────────────────────────────
+
+model Supplier {
+  id    Int     @id @default(autoincrement())
+  name  String  @db.VarChar(100)
+  code  String? @db.VarChar(50)
+  email String? @db.VarChar(100)
+  note  String?
+
+  materials      Material[]
+  edges          Edge[]
+  hardware       Hardware[]
+  purchaseOrders PurchaseOrder[]
+  invoices       Invoice[]
+
+  createdAt DateTime @default(now())
+}
+
+// ─── MATERIÁLY ────────────────────────────────────────────
+
+model Material {
+  id         Int       @id @default(autoincrement())
+  name       String    @db.VarChar(100)
+  code       String?   @db.VarChar(50)
+  thickness  Decimal   @db.Decimal(5, 2) // mm
+  grain      Boolean   @default(false)
+  pricePerM2 Decimal?  @db.Decimal(10, 2)
+  supplier   Supplier? @relation(fields: [supplierId], references: [id])
+  supplierId Int?
+
+  orderItems OrderItem[]
+  bomItems   BomItem[]
+
+  createdAt DateTime @default(now())
+}
+
+// ─── HRANY ────────────────────────────────────────────────
+
+model Edge {
+  id         Int       @id @default(autoincrement())
+  name       String?   @db.VarChar(100)
+  code       String?   @db.VarChar(50)
+  thickness  Decimal?  @db.Decimal(4, 2) // mm
+  color      String?   @db.VarChar(50)
+  pricePerM  Decimal?  @db.Decimal(10, 2)
+  supplier   Supplier? @relation(fields: [supplierId], references: [id])
+  supplierId Int?
+
+  createdAt DateTime @default(now())
+}
+
+// ─── KOVÁNÍ ───────────────────────────────────────────────
+
+model Hardware {
+  id           Int          @id @default(autoincrement())
+  type         HardwareType
+  name         String?      @db.VarChar(100)
+  supplierCode String?      @db.VarChar(50)
+  supplier     Supplier?    @relation(fields: [supplierId], references: [id])
+  supplierId   Int?
+  params       Json?
+  // hinge:        { overlay: "full", softClose: true, cupSize: 35 }
+  // drawerSlide:  { height: 268, length: 500, load: 30 }
+  // handleBar:    { height_mm: 32 }
+  price        Decimal?     @db.Decimal(10, 2)
+  specUrl      String?      @db.VarChar(255)
+
+  orderItems         OrderItem[]
+  purchaseOrderItems PurchaseOrderItem[]
+  invoiceItems       InvoiceItem[]
+
+  createdAt DateTime @default(now())
+}
+
+enum HardwareType {
+  hinge
+  tip_on
+  handle
+  handle_bar
+  drawer_slide
+  rectification_strip
+  hang_strip
+}
+
+// ─── ŠABLONY SKŘÍNĚK ──────────────────────────────────────
+
+model CabinetTemplate {
+  id      Int    @id @default(autoincrement())
+  name    String @db.VarChar(100)
+  version Int    @default(1)
+  rules   Json
+  // celá logika: díly, vzorce, podmínky kování
+
+  orderItems OrderItem[]
+  createdAt  DateTime    @default(now())
+}
+
+// ─── ZAKÁZKY ──────────────────────────────────────────────
+
+model Order {
+  id       Int         @id @default(autoincrement())
+  name     String?     @db.VarChar(100)
+  customer String?     @db.VarChar(100)
+  status   OrderStatus @default(draft)
+
+  items          OrderItem[]
+  purchaseOrders PurchaseOrder[]
+
+  createdAt DateTime @default(now())
+}
+
+enum OrderStatus {
+  draft
+  confirmed
+  in_production
+  done
+  invoiced
+}
+
+// ─── POLOŽKY ZAKÁZKY ──────────────────────────────────────
+
+model OrderItem {
+  id         Int             @id @default(autoincrement())
+  order      Order           @relation(fields: [orderId], references: [id])
+  orderId    Int
+  template   CabinetTemplate @relation(fields: [templateId], references: [id])
+  templateId Int
+  widthMm    Int
+  heightMm   Int
+  depthMm    Int
+  material   Material        @relation(fields: [materialId], references: [id])
+  materialId Int
+  backType   BackType
+  doorType   DoorType        @default(none)
+  handle     Hardware?       @relation(fields: [handleId], references: [id])
+  handleId   Int?
+  quantity   Int             @default(1)
+  snapshotBom Json? // BOM snapshot při potvrzení zakázky
+
+  bomItems BomItem[]
+
+  createdAt DateTime @default(now())
+}
+
+enum BackType {
+  overlaid_hdf
+  half_dado_hdf
+  rectification
+  overlaid_solid
+  dado_solid
+}
+
+enum DoorType {
+  none
+  handle
+  tip_on
+  handle_bar
+}
+
+// ─── KUSOVNÍK (BOM) ───────────────────────────────────────
+
+model BomItem {
+  id          Int       @id @default(autoincrement())
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id])
+  orderItemId Int
+  partName    String    @db.VarChar(100)
+  widthMm     Decimal   @db.Decimal(7, 2)
+  heightMm    Decimal   @db.Decimal(7, 2)
+  quantity    Int
+  material    Material  @relation(fields: [materialId], references: [id])
+  materialId  Int
+  edgeFront   Boolean   @default(false)
+  edgeBack    Boolean   @default(false)
+  edgeLeft    Boolean   @default(false)
+  edgeRight   Boolean   @default(false)
+  grain       GrainDir  @default(none)
+  note        String?
+}
+
+enum GrainDir {
+  vertical
+  horizontal
+  none
+}
+
+// ─── NÁKUPNÍ OBJEDNÁVKY ───────────────────────────────────
+
+model PurchaseOrder {
+  id         Int                 @id @default(autoincrement())
+  supplier   Supplier            @relation(fields: [supplierId], references: [id])
+  supplierId Int
+  order      Order?              @relation(fields: [orderId], references: [id])
+  orderId    Int?
+  status     PurchaseOrderStatus @default(draft)
+
+  items PurchaseOrderItem[]
+
+  createdAt DateTime @default(now())
+}
+
+enum PurchaseOrderStatus {
+  draft
+  sent
+  received
+  cancelled
+}
+
+model PurchaseOrderItem {
+  id              Int           @id @default(autoincrement())
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  purchaseOrderId Int
+  hardware        Hardware?     @relation(fields: [hardwareId], references: [id])
+  hardwareId      Int?
+  supplierCode    String?       @db.VarChar(50)
+  quantity        Int
+  pricePerUnit    Decimal?      @db.Decimal(10, 2)
+}
+
+// ─── FAKTURY ──────────────────────────────────────────────
+
+model Invoice {
+  id         Int           @id @default(autoincrement())
+  supplier   Supplier?     @relation(fields: [supplierId], references: [id])
+  supplierId Int?
+  scanUrl    String?       @db.VarChar(255)
+  ocrRaw     String?
+  parsedData Json?
+  status     InvoiceStatus @default(pending)
+
+  items InvoiceItem[]
+
+  createdAt DateTime @default(now())
+}
+
+enum InvoiceStatus {
+  pending
+  matched
+  confirmed
+}
+
+model InvoiceItem {
+  id           Int       @id @default(autoincrement())
+  invoice      Invoice   @relation(fields: [invoiceId], references: [id])
+  invoiceId    Int
+  supplierCode String?   @db.VarChar(50)
+  hardware     Hardware? @relation(fields: [hardwareId], references: [id])
+  hardwareId   Int? // NULL dokud nespárováno
+  nameRaw      String?   @db.VarChar(200)
+  quantity     Decimal?  @db.Decimal(10, 3)
+  pricePerUnit Decimal?  @db.Decimal(10, 2)
+  matched      Boolean   @default(false)
+}
