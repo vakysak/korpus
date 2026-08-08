@@ -160,30 +160,45 @@ export async function computeUpperCabinet(input) {
   );
 
   // Dno / Puda: s = W - 2*Tc, v = D
+  // Retifikace: puda v = D - 20 (2 cm), police v = D - 40 (4 cm)
+  const isRectification = String(backType).toUpperCase() === "RECTIFICATION";
   const dnoW = W - 2 * Tc;
   const dnoH = D;
+  const pudaH = isRectification ? D - 20 : D;
   parts.push(
     makePart("dno", "BOARD", dnoW, dnoH, Tc, materialCorpus, corpusPrice, 1, { front: true }, "predni hrana"),
   );
   parts.push(
-    makePart("puda", "BOARD", dnoW, dnoH, Tc, materialCorpus, corpusPrice, 1, { front: true }, "predni hrana"),
+    makePart(
+      "puda",
+      "BOARD",
+      dnoW,
+      pudaH,
+      Tc,
+      materialCorpus,
+      corpusPrice,
+      1,
+      { front: true },
+      isRectification ? "predni hrana · retifikace D-20" : "predni hrana",
+    ),
   );
 
-  // Police: s = W - 2*Tc, v = D - 20
+  // Police: s = W - 2*Tc, v = D - 20 (retifikace: D - 40)
   const shelves = Number(shelfCount) || 0;
   if (shelves > 0) {
+    const policeH = isRectification ? D - 40 : D - 20;
     parts.push(
       makePart(
         "police",
         "BOARD",
         W - 2 * Tc,
-        D - 20,
+        policeH,
         Tc,
         materialCorpus,
         corpusPrice,
         shelves,
         { front: true },
-        "predni hrana",
+        isRectification ? "predni hrana · retifikace D-40" : "predni hrana",
       ),
     );
   }
