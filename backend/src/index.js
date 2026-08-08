@@ -1,40 +1,28 @@
 import "dotenv/config";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import express from "express";
 import { prisma } from "./db.js";
 import bomRoutes from "./routes/bom.js";
+import importRoutes from "./routes/import.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const publicDir = path.join(__dirname, "../public");
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
 
 app.use(express.json());
 app.use("/api", bomRoutes);
+app.use("/api/import", importRoutes);
 
 app.get("/health", async (_req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
-    res.json({ ok: true, service: "korpus", db: true, version: "0.3.0" });
+    res.json({ ok: true, service: "korpus", db: true, version: "0.4.0" });
   } catch (err) {
     res.status(503).json({ ok: false, service: "korpus", db: false, error: String(err.message) });
   }
-});
-
-app.get("/", (_req, res) => {
-  res.json({
-    name: "Korpus API",
-    version: "0.3.0",
-    docs: {
-      health: "GET /health",
-      suppliers: "GET /api/suppliers",
-      materials: "GET /api/materials",
-      hardware: "GET /api/hardware",
-      prices: "GET /api/prices",
-      templates: "GET /api/templates",
-      customers: "GET|POST /api/customers",
-      orders: "GET|POST /api/orders",
-      orderItems: "POST /api/orders/:id/items",
-      bom: "GET|POST /api/orders/:id/bom",
-    },
-  });
 });
 
 app.get("/api/suppliers", async (_req, res) => {
@@ -141,6 +129,14 @@ app.get("/api/orders/:id", async (req, res) => {
 app.use((err, _req, res, _next) => {
   console.error(err);
   res.status(500).json({ error: "Internal server error" });
+});
+
+app.use(express.static(publicDir));
+app.get("*", (req, res, next) => {
+  if (req.path.startsWith("/api") || req.path === "/health") return next();
+  res.sendFile(path.join(publicDir, "index.html"), (err) => {
+    if (err) res.status(404).json({ error: "UI not built" });
+  });
 });
 
 app.listen(port, "0.0.0.0", () => {

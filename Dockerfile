@@ -1,3 +1,10 @@
+FROM node:22-alpine AS frontend
+WORKDIR /frontend
+COPY frontend/package.json frontend/package-lock.json* ./
+RUN npm install
+COPY frontend/ ./
+RUN npm run build
+
 FROM node:22-alpine
 WORKDIR /app
 
@@ -7,7 +14,9 @@ RUN npm install --omit=dev \
   && npx prisma generate
 
 COPY backend/ ./
-RUN chmod +x docker-entrypoint.sh
+COPY --from=frontend /frontend/dist ./public
+RUN chmod +x docker-entrypoint.sh \
+  && mkdir -p tmp/uploads
 
 ENV PORT=3000
 EXPOSE 3000

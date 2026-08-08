@@ -2,7 +2,9 @@ node_modules/
 .env
 .env.*
 !.env.example
-!.env.coolify.local
 .env.coolify.local
 dist/
+backend/public/
+backend/tmp/uploads/
 .DS_Store
+

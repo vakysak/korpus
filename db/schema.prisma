@@ -21,6 +21,7 @@ model Supplier {
   materials      Material[]
   hardware       Hardware[]
   priceListItems PriceListItem[]
+  importLogs     ImportLog[]
 }
 
 // ─── MATERIÁLY ────────────────────────────────────────────────────────────────
@@ -224,4 +225,28 @@ enum BomPartType {
   BOARD
   EDGE
   HARDWARE
+}
+
+// ─── IMPORT LOG ───────────────────────────────────────────────────────────────
+
+model ImportLog {
+  id         Int          @id @default(autoincrement())
+  supplierId Int
+  fileName   String       @db.VarChar(255)
+  status     ImportStatus @default(OK)
+  matAdded   Int          @default(0)
+  matUpdated Int          @default(0)
+  hwAdded    Int          @default(0)
+  hwUpdated  Int          @default(0)
+  errorCount Int          @default(0)
+  errors     Json?
+  createdAt  DateTime     @default(now())
+
+  supplier Supplier @relation(fields: [supplierId], references: [id])
+}
+
+enum ImportStatus {
+  OK
+  PARTIAL
+  FAILED
 }

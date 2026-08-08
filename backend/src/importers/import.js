@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { Command } from "commander";
 import { prisma } from "../db.js";
+import { upsertMaterial, upsertHardware } from "./catalog.js";
 import * as demos from "./parsers/demos.js";
 import * as trust from "./parsers/trust.js";
 import * as egger from "./parsers/egger.js";
@@ -10,82 +11,6 @@ import * as blum from "./parsers/blum.js";
 import * as hettich from "./parsers/hettich.js";
 
 const parsers = { demos, trust, egger, blum, hettich };
-
-async function upsertMaterial(supplierId, item, validFrom) {
-  const mat = await prisma.material.upsert({
-    where: { supplierId_supplierCode: { supplierId, supplierCode: item.supplierCode } },
-    update: {
-      name: item.name,
-      category: item.category,
-      thickness: item.thickness,
-      widthMm: item.widthMm ?? null,
-      heightMm: item.heightMm ?? null,
-      inStock: item.inStock,
-      active: true,
-    },
-    create: {
-      supplierId,
-      supplierCode: item.supplierCode,
-      name: item.name,
-      category: item.category,
-      thickness: item.thickness,
-      widthMm: item.widthMm ?? null,
-      heightMm: item.heightMm ?? null,
-      inStock: item.inStock,
-    },
-  });
-
-  await prisma.priceListItem.updateMany({
-    where: { materialId: mat.id, validTo: null },
-    data: { validTo: validFrom },
-  });
-  await prisma.priceListItem.create({
-    data: {
-      supplierId,
-      materialId: mat.id,
-      unit: item.unit,
-      price: item.price,
-      validFrom,
-    },
-  });
-  return mat;
-}
-
-async function upsertHardware(supplierId, item, validFrom) {
-  const hw = await prisma.hardware.upsert({
-    where: { supplierId_supplierCode: { supplierId, supplierCode: item.supplierCode } },
-    update: {
-      name: item.name,
-      type: item.type,
-      packQty: item.packQty,
-      inStock: item.inStock,
-      active: true,
-    },
-    create: {
-      supplierId,
-      supplierCode: item.supplierCode,
-      name: item.name,
-      type: item.type,
-      packQty: item.packQty,
-      inStock: item.inStock,
-    },
-  });
-
-  await prisma.priceListItem.updateMany({
-    where: { hardwareId: hw.id, validTo: null },
-    data: { validTo: validFrom },
-  });
-  await prisma.priceListItem.create({
-    data: {
-      supplierId,
-      hardwareId: hw.id,
-      unit: item.unit,
-      price: item.price,
-      validFrom,
-    },
-  });
-  return hw;
-}
 
 async function run(supplierCode, filePath) {
   const parser = parsers[supplierCode.toLowerCase()];

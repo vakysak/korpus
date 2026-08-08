@@ -1,6 +1,6 @@
 {
   "name": "korpus-backend",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -21,6 +21,7 @@
     "commander": "^13.1.0",
     "dotenv": "^16.6.1",
     "express": "^4.21.2",
+    "multer": "^2.2.0",
     "prisma": "^6.14.0"
   }
 }
