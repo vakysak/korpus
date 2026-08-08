@@ -399,14 +399,16 @@ export async function computeUpperCabinet(input) {
   }
 
   // ── Spodni rampa ──────────────────────────────────────────────────────────
+  // s = W + (pohledove boky × Tf), v/h dilu = h skrine + 21 (D + 21)
   if (bottomRailEnabled) {
     const rampaSpodniW = W + visibleSideCount * Tf;
+    const rampaSpodniH = D + 21;
     parts.push(
       makePart(
         "rampa_spodni",
         "FRONT",
         rampaSpodniW,
-        Tf,
+        rampaSpodniH,
         Tf,
         materialFront,
         frontPrice,
@@ -414,7 +416,7 @@ export async function computeUpperCabinet(input) {
         { top: true, left: true, right: true },
         bottomRailLed
           ? `spodni rampa – LED ${bottomRailLedType} / ${bottomRailLedColor ?? ""}`
-          : "spodni rampa",
+          : "spodni rampa · D+21",
       ),
     );
 
