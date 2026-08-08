@@ -112,32 +112,94 @@ async function main() {
     data: { supplierId: blum.id, hardwareId: hinge.id, unit: "PC", price: 45, validFrom: now },
   });
 
-  const existingTpl = await prisma.cabinetTemplate.findFirst({ where: { name: "Spodni skrinka 1D" } });
-  if (!existingTpl) {
-    await prisma.cabinetTemplate.create({
-      data: {
-        name: "Spodni skrinka 1D",
-        version: 1,
-        rules: {
-          parts: [
-            { name: "top", width: "W", height: "D - back_offset", material: "corpus" },
-            { name: "bottom", width: "W", height: "D - back_offset", material: "corpus" },
-            { name: "left", width: "H - 2*T", height: "D - back_offset", material: "corpus" },
-            { name: "right", width: "H - 2*T", height: "D - back_offset", material: "corpus" },
-            { name: "back", width: "W - 2*T", height: "H - 2*T", material: "back" },
-            { name: "door", width: "W", height: "H", material: "front" },
-          ],
-          defaults: {
-            thickness_corpus: 18,
-            back_offset_overlaid_hdf: 0,
-            back_offset_half_dado_hdf: 9,
-          },
-          hardware_rules: [
-            { type: "hinge", count: 2, condition: "door_height <= 900" },
-            { type: "hinge", count: 3, condition: "door_height > 900" },
-          ],
-        },
+  const defaults = {
+    thickness_corpus: 18,
+    back_offset_overlaid_hdf: 0,
+    back_offset_half_dado_hdf: 9,
+  };
+
+  const templateDefs = [
+    {
+      name: "Spodni skrinka 1D",
+      rules: {
+        parts: [
+          { name: "top", width: "W", height: "D - back_offset", material: "corpus" },
+          { name: "bottom", width: "W", height: "D - back_offset", material: "corpus" },
+          { name: "left", width: "H - 2*T", height: "D - back_offset", material: "corpus" },
+          { name: "right", width: "H - 2*T", height: "D - back_offset", material: "corpus" },
+          { name: "back", width: "W - 2*T", height: "H - 2*T", material: "back" },
+          { name: "door", width: "W", height: "H", material: "front" },
+        ],
+        defaults,
+        hardware_rules: [
+          { type: "hinge", count: 2, condition: "door_height <= 900" },
+          { type: "hinge", count: 3, condition: "door_height > 900" },
+        ],
       },
+    },
+    {
+      name: "Horni skrinka 1D",
+      rules: {
+        parts: [
+          { name: "top", width: "W", height: "D - back_offset", material: "corpus" },
+          { name: "bottom", width: "W", height: "D - back_offset", material: "corpus" },
+          { name: "left", width: "H - 2*T", height: "D - back_offset", material: "corpus" },
+          { name: "right", width: "H - 2*T", height: "D - back_offset", material: "corpus" },
+          { name: "back", width: "W - 2*T", height: "H - 2*T", material: "back" },
+          { name: "door", width: "W", height: "H", material: "front" },
+        ],
+        defaults,
+        hardware_rules: [
+          { type: "hinge", count: 2, condition: "door_height <= 600" },
+          { type: "hinge", count: 3, condition: "door_height > 600" },
+        ],
+      },
+    },
+    {
+      name: "Spodni skrinka 2D",
+      rules: {
+        parts: [
+          { name: "top", width: "W", height: "D - back_offset", material: "corpus" },
+          { name: "bottom", width: "W", height: "D - back_offset", material: "corpus" },
+          { name: "left", width: "H - 2*T", height: "D - back_offset", material: "corpus" },
+          { name: "right", width: "H - 2*T", height: "D - back_offset", material: "corpus" },
+          { name: "middle", width: "H - 2*T", height: "D - back_offset", material: "corpus" },
+          { name: "back", width: "W - 2*T", height: "H - 2*T", material: "back" },
+          { name: "door_l", width: "W / 2", height: "H", material: "front" },
+          { name: "door_r", width: "W / 2", height: "H", material: "front" },
+        ],
+        defaults,
+        hardware_rules: [
+          { type: "hinge", count: 4, condition: "door_height <= 900" },
+          { type: "hinge", count: 6, condition: "door_height > 900" },
+        ],
+      },
+    },
+    {
+      name: "Vitrina 1D sklo",
+      rules: {
+        parts: [
+          { name: "top", width: "W", height: "D - back_offset", material: "corpus" },
+          { name: "bottom", width: "W", height: "D - back_offset", material: "corpus" },
+          { name: "left", width: "H - 2*T", height: "D - back_offset", material: "corpus" },
+          { name: "right", width: "H - 2*T", height: "D - back_offset", material: "corpus" },
+          { name: "back", width: "W - 2*T", height: "H - 2*T", material: "back" },
+          { name: "door", width: "W - 4", height: "H - 4", material: "front" },
+        ],
+        defaults,
+        hardware_rules: [
+          { type: "hinge", count: 2, condition: "door_height <= 800" },
+          { type: "hinge", count: 3, condition: "door_height > 800" },
+        ],
+      },
+    },
+  ];
+
+  for (const def of templateDefs) {
+    await prisma.cabinetTemplate.upsert({
+      where: { name_version: { name: def.name, version: 1 } },
+      update: { rules: def.rules, active: true },
+      create: { name: def.name, version: 1, rules: def.rules },
     });
   }
 
@@ -145,6 +207,7 @@ async function main() {
     suppliers: ["DEMOS", "TRUST", "EGGER", "BLUM", "HETTICH"],
     materials: [corpus.supplierCode, back.supplierCode, front.supplierCode],
     hinge: hinge.supplierCode,
+    templates: templateDefs.map((t) => t.name),
   });
 }
 

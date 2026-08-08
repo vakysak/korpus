@@ -130,6 +130,8 @@ model CabinetTemplate {
   createdAt DateTime @default(now())
 
   orderItems OrderItem[]
+
+  @@unique([name, version])
 }
 
 // ─── ZÁKAZNÍCI ────────────────────────────────────────────────────────────────

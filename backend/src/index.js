@@ -4,7 +4,11 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import { prisma } from "./db.js";
 import bomRoutes from "./routes/bom.js";
+import bomPreviewRoutes from "./routes/bomPreview.js";
 import importRoutes from "./routes/import.js";
+import catalogRoutes from "./routes/catalog.js";
+import materialsRoutes from "./routes/materials.js";
+import hardwareRoutes from "./routes/hardware.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(__dirname, "../public");
@@ -14,12 +18,16 @@ const port = Number(process.env.PORT || 3000);
 
 app.use(express.json());
 app.use("/api", bomRoutes);
+app.use("/api/bom", bomPreviewRoutes);
 app.use("/api/import", importRoutes);
+app.use("/api/templates", catalogRoutes);
+app.use("/api/materials", materialsRoutes);
+app.use("/api/hardware", hardwareRoutes);
 
 app.get("/health", async (_req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
-    res.json({ ok: true, service: "korpus", db: true, version: "0.4.0" });
+    res.json({ ok: true, service: "korpus", db: true, version: "0.5.0" });
   } catch (err) {
     res.status(503).json({ ok: false, service: "korpus", db: false, error: String(err.message) });
   }
@@ -27,30 +35,6 @@ app.get("/health", async (_req, res) => {
 
 app.get("/api/suppliers", async (_req, res) => {
   res.json(await prisma.supplier.findMany({ where: { active: true }, orderBy: { priority: "asc" } }));
-});
-
-app.get("/api/materials", async (req, res) => {
-  const where = { active: true };
-  if (req.query.category) where.category = String(req.query.category).toUpperCase();
-  res.json(
-    await prisma.material.findMany({
-      where,
-      include: { supplier: true },
-      orderBy: { name: "asc" },
-    }),
-  );
-});
-
-app.get("/api/hardware", async (req, res) => {
-  const where = { active: true };
-  if (req.query.type) where.type = String(req.query.type).toUpperCase();
-  res.json(
-    await prisma.hardware.findMany({
-      where,
-      include: { supplier: true },
-      orderBy: [{ type: "asc" }, { name: "asc" }],
-    }),
-  );
 });
 
 app.get("/api/prices", async (_req, res) => {
@@ -65,10 +49,6 @@ app.get("/api/prices", async (_req, res) => {
       orderBy: { validFrom: "desc" },
     }),
   );
-});
-
-app.get("/api/templates", async (_req, res) => {
-  res.json(await prisma.cabinetTemplate.findMany({ where: { active: true }, orderBy: { name: "asc" } }));
 });
 
 app.get("/api/customers", async (_req, res) => {
