@@ -3,6 +3,8 @@ import ImportPage from "./pages/ImportPage.jsx";
 import HomePage from "./pages/HomePage.jsx";
 import CatalogPage from "./pages/CatalogPage.jsx";
 import ConfiguratorPage from "./pages/ConfiguratorPage.jsx";
+import OrdersPage from "./pages/OrdersPage.jsx";
+import OrderDetailPage from "./pages/OrderDetailPage.jsx";
 
 const linkClass = ({ isActive }) =>
   `text-sm tracking-wide ${isActive ? "text-[#8b5a2b]" : "text-stone-600 hover:text-stone-900"}`;
@@ -23,6 +25,9 @@ export default function App() {
               <NavLink to="/catalog" className={linkClass}>
                 Katalog
               </NavLink>
+              <NavLink to="/orders" className={linkClass}>
+                Objednavky
+              </NavLink>
               <NavLink to="/import" className={linkClass}>
                 Import ceniku
               </NavLink>
@@ -33,6 +38,8 @@ export default function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/catalog" element={<CatalogPage />} />
           <Route path="/configurator/:id" element={<ConfiguratorPage />} />
+          <Route path="/orders" element={<OrdersPage />} />
+          <Route path="/orders/:id" element={<OrderDetailPage />} />
           <Route path="/import" element={<ImportPage />} />
         </Routes>
       </div>

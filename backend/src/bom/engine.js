@@ -202,10 +202,18 @@ export async function computeBom(template, input) {
 
     let unitPrice = null;
     let totalPrice = null;
+    let unit = "M2";
+    let qty = 1;
     if (material) {
       const priceItem = await getMaterialPrice(material.id);
       unitPrice = priceItem ? parseFloat(priceItem.price) : null;
       totalPrice = priceItem ? calcPartPrice(w, h, priceItem) : null;
+      unit = priceItem?.unit ?? "M2";
+      if (unit === "M2") {
+        qty = parseFloat(((w / 1000) * (h / 1000)).toFixed(4));
+      } else if (unit === "BM") {
+        qty = parseFloat((w / 1000).toFixed(4));
+      }
       if (!priceItem) warnings.push(`Dil "${part.name}": chybi cena materialu id=${material.id}`);
     }
 
@@ -215,8 +223,11 @@ export async function computeBom(template, input) {
       widthMm: w,
       heightMm: h,
       thickness: material ? Number(material.thickness) : T,
+      materialId: material?.id ?? null,
+      supplierId: material?.supplierId ?? null,
       material: serializeMaterial(material),
-      qty: 1,
+      qty,
+      unit,
       unitPrice,
       totalPrice,
     });
@@ -253,6 +264,7 @@ export async function computeBom(template, input) {
         partName: rule.type,
         partType: "HARDWARE",
         hardwareId: hw?.id ?? null,
+        supplierId: hw?.supplierId ?? null,
         hardware: hw
           ? {
               id: hw.id,
@@ -263,6 +275,7 @@ export async function computeBom(template, input) {
             }
           : null,
         qty: rule.count,
+        unit: "PC",
         unitPrice,
         totalPrice,
       });

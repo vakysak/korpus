@@ -1,3 +1,6 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+
 const PART_TYPE_LABEL = { BOARD: "Dil", EDGE: "Hrana", HARDWARE: "Kovani" };
 
 function formatMoney(value) {
@@ -5,7 +8,49 @@ function formatMoney(value) {
   return `${Number(value).toLocaleString("cs-CZ", { minimumFractionDigits: 2 })} Kc`;
 }
 
-export default function BomPreview({ bom, advice, loading, error, dimensions, templateName }) {
+export default function BomPreview({
+  bom,
+  advice,
+  loading,
+  error,
+  dimensions,
+  templateName,
+  templateId,
+  onOrder,
+}) {
+  const navigate = useNavigate();
+  const [ordering, setOrdering] = useState(false);
+  const [orderId, setOrderId] = useState(null);
+  const [orderError, setOrderError] = useState(null);
+
+  async function handleCreateOrder() {
+    if (!bom) return;
+    setOrdering(true);
+    setOrderError(null);
+    try {
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          templateId,
+          widthMm: dimensions.widthMm,
+          heightMm: dimensions.heightMm,
+          depthMm: dimensions.depthMm,
+          backType: dimensions.backType,
+          bom,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Chyba pri vytvareni");
+      setOrderId(data.id);
+      onOrder?.(data);
+    } catch (err) {
+      setOrderError(err.message);
+    } finally {
+      setOrdering(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-[300px] items-center justify-center border border-[#d6d0c4] bg-[#faf8f3] p-8">
@@ -127,6 +172,34 @@ export default function BomPreview({ bom, advice, loading, error, dimensions, te
           </span>
           <span className="text-lg font-semibold">{formatMoney(bom.totalPrice)}</span>
         </div>
+
+        {orderError && <p className="mt-3 text-sm text-red-600">{orderError}</p>}
+
+        {!orderId && (
+          <button
+            type="button"
+            onClick={handleCreateOrder}
+            disabled={ordering}
+            className="mt-3 w-full bg-[#8b5a2b] py-2.5 text-sm font-medium text-[#f7f4ee] transition hover:bg-[#734820] disabled:opacity-40"
+          >
+            {ordering ? "Ukladam…" : "Vytvorit objednavku"}
+          </button>
+        )}
+
+        {orderId && (
+          <div className="mt-3 flex gap-2">
+            <div className="flex-1 border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800">
+              Objednavka #{orderId} vytvorena
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate(`/orders/${orderId}`)}
+              className="border border-[#d6d0c4] px-4 py-2 text-sm text-stone-700 hover:bg-white"
+            >
+              Detail →
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

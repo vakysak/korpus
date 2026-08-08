@@ -3,12 +3,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
 import { prisma } from "./db.js";
-import bomRoutes from "./routes/bom.js";
 import bomPreviewRoutes from "./routes/bomPreview.js";
 import importRoutes from "./routes/import.js";
 import catalogRoutes from "./routes/catalog.js";
 import materialsRoutes from "./routes/materials.js";
 import hardwareRoutes from "./routes/hardware.js";
+import ordersRoutes from "./routes/orders.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(__dirname, "../public");
@@ -17,17 +17,17 @@ const app = express();
 const port = Number(process.env.PORT || 3000);
 
 app.use(express.json());
-app.use("/api", bomRoutes);
 app.use("/api/bom", bomPreviewRoutes);
 app.use("/api/import", importRoutes);
 app.use("/api/templates", catalogRoutes);
 app.use("/api/materials", materialsRoutes);
 app.use("/api/hardware", hardwareRoutes);
+app.use("/api/orders", ordersRoutes);
 
 app.get("/health", async (_req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
-    res.json({ ok: true, service: "korpus", db: true, version: "0.5.0" });
+    res.json({ ok: true, service: "korpus", db: true, version: "0.6.0" });
   } catch (err) {
     res.status(503).json({ ok: false, service: "korpus", db: false, error: String(err.message) });
   }
@@ -62,48 +62,6 @@ app.post("/api/customers", async (req, res) => {
     data: { name, email: email ?? null, phone: phone ?? null, note: note ?? null },
   });
   res.status(201).json(data);
-});
-
-app.get("/api/orders", async (_req, res) => {
-  res.json(
-    await prisma.order.findMany({
-      include: { customer: true, items: true },
-      orderBy: { createdAt: "desc" },
-    }),
-  );
-});
-
-app.post("/api/orders", async (req, res) => {
-  const { customerId, note, status } = req.body ?? {};
-  const data = await prisma.order.create({
-    data: {
-      customerId: customerId != null ? Number(customerId) : null,
-      note: note ?? null,
-      status: status ? String(status).toUpperCase() : "DRAFT",
-    },
-  });
-  res.status(201).json(data);
-});
-
-app.get("/api/orders/:id", async (req, res) => {
-  const id = Number(req.params.id);
-  const data = await prisma.order.findUnique({
-    where: { id },
-    include: {
-      customer: true,
-      items: {
-        include: {
-          template: true,
-          materialCorpus: true,
-          materialBack: true,
-          materialFront: true,
-          bomItems: true,
-        },
-      },
-    },
-  });
-  if (!data) return res.status(404).json({ error: "Order not found" });
-  res.json(data);
 });
 
 app.use((err, _req, res, _next) => {

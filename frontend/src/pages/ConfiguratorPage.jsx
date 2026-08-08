@@ -206,6 +206,7 @@ export default function ConfiguratorPage() {
           error={error}
           dimensions={form}
           templateName={template.name}
+          templateId={template.id}
         />
       </div>
     </div>

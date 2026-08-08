@@ -22,6 +22,7 @@ model Supplier {
   hardware       Hardware[]
   priceListItems PriceListItem[]
   importLogs     ImportLog[]
+  orderItems     OrderItem[]
 }
 
 // ─── MATERIÁLY ────────────────────────────────────────────────────────────────
@@ -43,10 +44,7 @@ model Material {
 
   supplier       Supplier        @relation(fields: [supplierId], references: [id])
   priceListItems PriceListItem[]
-
-  orderItemsCorpus OrderItem[] @relation("CorpusMaterial")
-  orderItemsBack   OrderItem[] @relation("BackMaterial")
-  orderItemsFront  OrderItem[] @relation("FrontMaterial")
+  orderItems     OrderItem[]
 
   @@unique([supplierId, supplierCode])
 }
@@ -75,7 +73,7 @@ model Hardware {
 
   supplier       Supplier        @relation(fields: [supplierId], references: [id])
   priceListItems PriceListItem[]
-  bomItems       BomItem[]
+  orderItems     OrderItem[]
 
   @@unique([supplierId, supplierCode])
 }
@@ -129,7 +127,7 @@ model CabinetTemplate {
 
   createdAt DateTime @default(now())
 
-  orderItems OrderItem[]
+  orders Order[]
 
   @@unique([name, version])
 }
@@ -153,48 +151,33 @@ model Customer {
 model Order {
   id         Int         @id @default(autoincrement())
   customerId Int?
+  templateId Int?
   status     OrderStatus @default(DRAFT)
-  note       String?
+  widthMm    Int
+  heightMm   Int
+  depthMm    Int
+  backType   BackType    @default(OVERLAID_HDF)
+  totalPrice Decimal     @db.Decimal(10, 2)
+  notes      String?     @db.Text
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  customer Customer?   @relation(fields: [customerId], references: [id])
+  customer Customer?        @relation(fields: [customerId], references: [id])
+  template CabinetTemplate? @relation(fields: [templateId], references: [id])
   items    OrderItem[]
+
+  @@index([status])
+  @@index([createdAt])
 }
 
 enum OrderStatus {
   DRAFT
   CONFIRMED
+  ORDERED
   IN_PRODUCTION
   DONE
   CANCELLED
-}
-
-// ─── POLOŽKY OBJEDNÁVKY ───────────────────────────────────────────────────────
-
-model OrderItem {
-  id              Int      @id @default(autoincrement())
-  orderId         Int
-  templateId      Int
-  widthMm         Int
-  heightMm        Int
-  depthMm         Int
-  qty             Int      @default(1)
-  backType        BackType @default(OVERLAID_HDF)
-  materialId      Int
-  materialBackId  Int
-  materialFrontId Int
-  snapshotBom     Json?
-
-  createdAt DateTime @default(now())
-
-  order          Order           @relation(fields: [orderId], references: [id])
-  template       CabinetTemplate @relation(fields: [templateId], references: [id])
-  materialCorpus Material        @relation("CorpusMaterial", fields: [materialId], references: [id])
-  materialBack   Material        @relation("BackMaterial", fields: [materialBackId], references: [id])
-  materialFront  Material        @relation("FrontMaterial", fields: [materialFrontId], references: [id])
-  bomItems       BomItem[]
 }
 
 enum BackType {
@@ -202,31 +185,31 @@ enum BackType {
   HALF_DADO_HDF
 }
 
-// ─── BOM ──────────────────────────────────────────────────────────────────────
+// ─── POLOŽKY OBJEDNÁVKY (BOM řádky) ───────────────────────────────────────────
 
-model BomItem {
-  id          Int         @id @default(autoincrement())
-  orderItemId Int
-  hardwareId  Int?
-  partName    String      @db.VarChar(100)
-  partType    BomPartType
-  widthMm     Int?
-  heightMm    Int?
-  thickness   Decimal?    @db.Decimal(6, 2)
-  qty         Int         @default(1)
-  unitPrice   Decimal?    @db.Decimal(10, 4)
-  totalPrice  Decimal?    @db.Decimal(10, 4)
+model OrderItem {
+  id         Int      @id @default(autoincrement())
+  orderId    Int
+  partName   String   @db.VarChar(100)
+  partType   String   @db.VarChar(20)
+  materialId Int?
+  hardwareId Int?
+  widthMm    Int?
+  heightMm   Int?
+  thickness  Decimal? @db.Decimal(5, 1)
+  qty        Decimal  @db.Decimal(10, 4)
+  unit       String   @db.VarChar(10)
+  unitPrice  Decimal  @db.Decimal(10, 4)
+  totalPrice Decimal  @db.Decimal(10, 2)
+  supplierId Int?
 
-  createdAt DateTime @default(now())
+  order    Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  material Material? @relation(fields: [materialId], references: [id])
+  hardware Hardware? @relation(fields: [hardwareId], references: [id])
+  supplier Supplier? @relation(fields: [supplierId], references: [id])
 
-  orderItem OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
-  hardware  Hardware? @relation(fields: [hardwareId], references: [id])
-}
-
-enum BomPartType {
-  BOARD
-  EDGE
-  HARDWARE
+  @@index([orderId])
+  @@index([supplierId])
 }
 
 // ─── IMPORT LOG ───────────────────────────────────────────────────────────────
