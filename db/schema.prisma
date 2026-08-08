@@ -74,6 +74,7 @@ model Hardware {
   supplier       Supplier        @relation(fields: [supplierId], references: [id])
   priceListItems PriceListItem[]
   orderItems     OrderItem[]
+  orderHandles   Order[]         @relation("OrderHandle")
 
   @@unique([supplierId, supplierCode])
 }
@@ -160,11 +161,31 @@ model Order {
   totalPrice Decimal     @db.Decimal(10, 2)
   notes      String?     @db.Text
 
+  // Horni skrinka – konfigurace
+  shelfCount           Int      @default(1)
+  visibleSideLeft      Boolean  @default(false)
+  visibleSideRight     Boolean  @default(false)
+  topRailEnabled       Boolean  @default(false)
+  topRailOverhang      Int      @default(21)
+  topRailLed           Boolean  @default(false)
+  topRailLedColor      String?  @db.VarChar(30)
+  topRailLedControl    String?  @db.VarChar(30)
+  bottomRailEnabled    Boolean  @default(false)
+  bottomRailLed        Boolean  @default(false)
+  bottomRailLedType    String?  @db.VarChar(20)
+  bottomRailLedColor   String?  @db.VarChar(30)
+  bottomRailLedControl String?  @db.VarChar(30)
+  doorType             DoorType @default(HANDLE)
+  handleId             Int?
+  handleBarHeight      Int?
+  hingeOverride        Int?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   customer Customer?        @relation(fields: [customerId], references: [id])
   template CabinetTemplate? @relation(fields: [templateId], references: [id])
+  handle   Hardware?        @relation("OrderHandle", fields: [handleId], references: [id])
   items    OrderItem[]
 
   @@index([status])
@@ -183,6 +204,16 @@ enum OrderStatus {
 enum BackType {
   OVERLAID_HDF
   HALF_DADO_HDF
+  RECTIFICATION
+  OVERLAID_SOLID
+  DADO_SOLID
+}
+
+enum DoorType {
+  HANDLE
+  HANDLE_BAR
+  TIP_ON
+  NONE
 }
 
 // ─── POLOŽKY OBJEDNÁVKY (BOM řádky) ───────────────────────────────────────────

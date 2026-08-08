@@ -71,8 +71,34 @@ const VALID_TRANSITIONS = {
 /** POST /api/orders – create from live BOM */
 router.post("/", async (req, res) => {
   try {
-    const { templateId, widthMm, heightMm, depthMm, backType, bom, customerId, notes } =
-      req.body ?? {};
+    const body = req.body ?? {};
+    const {
+      templateId,
+      widthMm,
+      heightMm,
+      depthMm,
+      backType,
+      bom,
+      customerId,
+      notes,
+      shelfCount,
+      visibleSideLeft,
+      visibleSideRight,
+      topRailEnabled,
+      topRailOverhang,
+      topRailLed,
+      topRailLedColor,
+      topRailLedControl,
+      bottomRailEnabled,
+      bottomRailLed,
+      bottomRailLedType,
+      bottomRailLedColor,
+      bottomRailLedControl,
+      doorType,
+      handleId,
+      handleBarHeight,
+      hingeOverride,
+    } = body;
 
     if (!bom) return res.status(400).json({ error: "Chybi bom" });
     if (!widthMm || !heightMm || !depthMm) {
@@ -83,6 +109,8 @@ router.post("/", async (req, res) => {
     if (!orderItems.length) {
       return res.status(400).json({ error: "BOM nema polozky" });
     }
+
+    const asBool = (v) => v === true || v === "true" || v === 1 || v === "1";
 
     const order = await prisma.order.create({
       data: {
@@ -95,6 +123,23 @@ router.post("/", async (req, res) => {
         totalPrice: bom.totalPrice ?? 0,
         notes: notes ?? null,
         status: "DRAFT",
+        shelfCount: Number(shelfCount ?? 1),
+        visibleSideLeft: asBool(visibleSideLeft),
+        visibleSideRight: asBool(visibleSideRight),
+        topRailEnabled: asBool(topRailEnabled),
+        topRailOverhang: Number(topRailOverhang ?? 21),
+        topRailLed: asBool(topRailLed),
+        topRailLedColor: topRailLedColor ?? null,
+        topRailLedControl: topRailLedControl ?? null,
+        bottomRailEnabled: asBool(bottomRailEnabled),
+        bottomRailLed: asBool(bottomRailLed),
+        bottomRailLedType: bottomRailLedType ?? null,
+        bottomRailLedColor: bottomRailLedColor ?? null,
+        bottomRailLedControl: bottomRailLedControl ?? null,
+        doorType: String(doorType ?? "HANDLE").toUpperCase(),
+        handleId: handleId ? Number(handleId) : null,
+        handleBarHeight: handleBarHeight != null ? Number(handleBarHeight) : null,
+        hingeOverride: hingeOverride != null && hingeOverride !== "" ? Number(hingeOverride) : null,
         items: { create: orderItems },
       },
       include: {

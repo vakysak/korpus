@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-const PART_TYPE_LABEL = { BOARD: "Dil", EDGE: "Hrana", HARDWARE: "Kovani" };
+const PART_TYPE_LABEL = { BOARD: "Dil", EDGE: "Hrana", FRONT: "Front", HARDWARE: "Kovani" };
 
 function formatMoney(value) {
   if (value == null) return "—";
@@ -16,6 +16,7 @@ export default function BomPreview({
   dimensions,
   templateName,
   templateId,
+  orderExtras = {},
   onOrder,
 }) {
   const navigate = useNavigate();
@@ -38,6 +39,7 @@ export default function BomPreview({
           depthMm: dimensions.depthMm,
           backType: dimensions.backType,
           bom,
+          ...orderExtras,
         }),
       });
       const data = await res.json();
@@ -127,7 +129,12 @@ export default function BomPreview({
           <tbody>
             {(bom.parts ?? []).map((part, i) => (
               <tr key={i} className="border-t border-[#e8e2d6]">
-                <td className="px-4 py-2.5 font-medium capitalize">{part.partName}</td>
+                <td className="px-4 py-2.5 font-medium capitalize">
+                  {part.partName}
+                  {part.notes ? (
+                    <span className="mt-0.5 block text-xs font-normal text-stone-400">{part.notes}</span>
+                  ) : null}
+                </td>
                 <td className="px-4 py-2.5 text-xs text-stone-500">
                   {PART_TYPE_LABEL[part.partType] ?? part.partType}
                 </td>
@@ -156,12 +163,25 @@ export default function BomPreview({
                 <tr key={i} className="border-t border-[#e8e2d6]">
                   <td className="px-4 py-2.5 font-medium capitalize">{hw.partName}</td>
                   <td className="px-4 py-2.5 text-xs text-stone-500">{hw.hardware?.name ?? "—"}</td>
-                  <td className="px-4 py-2.5 text-right">{hw.qty} ks</td>
+                  <td className="px-4 py-2.5 text-right">
+                    {hw.qty} {hw.unit === "BM" ? "bm" : "ks"}
+                  </td>
                   <td className="px-4 py-2.5 text-right font-medium">{formatMoney(hw.totalPrice)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {bom.meta && (
+        <div className="border border-[#d6d0c4] bg-[#faf8f3] px-4 py-3 text-xs text-stone-500">
+          {bom.meta.doorCount != null && <span>{bom.meta.doorCount} kridlo · </span>}
+          {bom.meta.hingeCount != null && <span>{bom.meta.hingeCount} panty · </span>}
+          {bom.meta.visibleSideCount != null && (
+            <span>{bom.meta.visibleSideCount} pohled. bok · </span>
+          )}
+          {bom.meta.backType && <span>{bom.meta.backType}</span>}
         </div>
       )}
 

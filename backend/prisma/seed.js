@@ -104,6 +104,45 @@ async function main() {
     },
   });
 
+  const tipOn = await prisma.hardware.upsert({
+    where: { supplierId_supplierCode: { supplierId: blum.id, supplierCode: "BLUM-TIPON" } },
+    update: { name: "Blum Tip-On", type: "OTHER", packQty: 1, inStock: true, active: true },
+    create: {
+      supplierId: blum.id,
+      supplierCode: "BLUM-TIPON",
+      name: "Blum Tip-On",
+      type: "OTHER",
+      packQty: 1,
+      inStock: true,
+    },
+  });
+
+  const handle = await prisma.hardware.upsert({
+    where: { supplierId_supplierCode: { supplierId: blum.id, supplierCode: "BLUM-HANDLE-128" } },
+    update: { name: "Uchytka 128mm", type: "HANDLE", packQty: 1, inStock: true, active: true },
+    create: {
+      supplierId: blum.id,
+      supplierCode: "BLUM-HANDLE-128",
+      name: "Uchytka 128mm",
+      type: "HANDLE",
+      packQty: 1,
+      inStock: true,
+    },
+  });
+
+  const led = await prisma.hardware.upsert({
+    where: { supplierId_supplierCode: { supplierId: blum.id, supplierCode: "LED-STRIP-WW" } },
+    update: { name: "LED pasek warm white", type: "OTHER", packQty: 1, inStock: true, active: true },
+    create: {
+      supplierId: blum.id,
+      supplierCode: "LED-STRIP-WW",
+      name: "LED pasek warm white",
+      type: "OTHER",
+      packQty: 1,
+      inStock: true,
+    },
+  });
+
   await prisma.priceListItem.updateMany({
     where: { hardwareId: hinge.id, validTo: null },
     data: { validTo: now },
@@ -111,6 +150,20 @@ async function main() {
   await prisma.priceListItem.create({
     data: { supplierId: blum.id, hardwareId: hinge.id, unit: "PC", price: 45, validFrom: now },
   });
+
+  for (const [hwId, price, unit] of [
+    [tipOn.id, 38, "PC"],
+    [handle.id, 55, "PC"],
+    [led.id, 120, "BM"],
+  ]) {
+    await prisma.priceListItem.updateMany({
+      where: { hardwareId: hwId, validTo: null },
+      data: { validTo: now },
+    });
+    await prisma.priceListItem.create({
+      data: { supplierId: blum.id, hardwareId: hwId, unit, price, validFrom: now },
+    });
+  }
 
   const defaults = {
     thickness_corpus: 18,
@@ -140,19 +193,16 @@ async function main() {
     {
       name: "Horni skrinka 1D",
       rules: {
-        parts: [
-          { name: "top", width: "W", height: "D - back_offset", material: "corpus" },
-          { name: "bottom", width: "W", height: "D - back_offset", material: "corpus" },
-          { name: "left", width: "H - 2*T", height: "D - back_offset", material: "corpus" },
-          { name: "right", width: "H - 2*T", height: "D - back_offset", material: "corpus" },
-          { name: "back", width: "W - 2*T", height: "H - 2*T", material: "back" },
-          { name: "door", width: "W", height: "H", material: "front" },
-        ],
-        defaults,
-        hardware_rules: [
-          { type: "hinge", count: 2, condition: "door_height <= 600" },
-          { type: "hinge", count: 3, condition: "door_height > 600" },
-        ],
+        engine: "upperCabinet",
+        defaults: {
+          depthMm: 320,
+          backType: "OVERLAID_HDF",
+          shelfCount: 1,
+          topRailEnabled: false,
+          topRailOverhang: 21,
+          bottomRailEnabled: false,
+          doorType: "HANDLE",
+        },
       },
     },
     {
@@ -206,7 +256,7 @@ async function main() {
   console.log("Seed OK", {
     suppliers: ["DEMOS", "TRUST", "EGGER", "BLUM", "HETTICH"],
     materials: [corpus.supplierCode, back.supplierCode, front.supplierCode],
-    hinge: hinge.supplierCode,
+    hardware: [hinge.supplierCode, tipOn.supplierCode, handle.supplierCode, led.supplierCode],
     templates: templateDefs.map((t) => t.name),
   });
 }

@@ -1,12 +1,18 @@
 import { Router } from "express";
 import { prisma } from "../db.js";
 import { computeBom } from "../bom/engine.js";
+import { computeUpperCabinet } from "../bom/parts/upperCabinet.js";
 import { advise } from "../ai/advisor.js";
 
 const router = Router();
 
+function asBool(v) {
+  return v === true || v === "true" || v === 1 || v === "1";
+}
+
 router.post("/preview", async (req, res) => {
   try {
+    const body = req.body ?? {};
     const {
       templateId,
       widthMm,
@@ -16,7 +22,24 @@ router.post("/preview", async (req, res) => {
       materialId,
       materialBackId,
       materialFrontId,
-    } = req.body ?? {};
+      shelfCount,
+      visibleSideLeft,
+      visibleSideRight,
+      topRailEnabled,
+      topRailOverhang,
+      topRailLed,
+      topRailLedColor,
+      topRailLedControl,
+      bottomRailEnabled,
+      bottomRailLed,
+      bottomRailLedType,
+      bottomRailLedColor,
+      bottomRailLedControl,
+      doorType,
+      handleId,
+      handleBarHeight,
+      hingeOverride,
+    } = body;
 
     const missing = [];
     if (!templateId) missing.push("templateId");
@@ -42,17 +65,45 @@ router.post("/preview", async (req, res) => {
     if (!back) return res.status(404).json({ error: "Material zad nenalezen" });
     if (!front) return res.status(404).json({ error: "Material frontu nenalezen" });
 
-    const input = {
-      widthMm: Number(widthMm),
-      heightMm: Number(heightMm),
-      depthMm: Number(depthMm),
-      backType: backType ?? "OVERLAID_HDF",
-      materialMap: { corpus, back, front },
-    };
+    let bom;
+    if (template.rules?.engine === "upperCabinet") {
+      bom = await computeUpperCabinet({
+        W: Number(widthMm),
+        H: Number(heightMm),
+        D: Number(depthMm),
+        materialCorpus: corpus,
+        materialBack: back,
+        materialFront: front,
+        backType: backType ?? "OVERLAID_HDF",
+        shelfCount: Number(shelfCount ?? 1),
+        visibleSideLeft: asBool(visibleSideLeft),
+        visibleSideRight: asBool(visibleSideRight),
+        topRailEnabled: asBool(topRailEnabled),
+        topRailOverhang: Number(topRailOverhang ?? 21),
+        topRailLed: asBool(topRailLed),
+        topRailLedColor: topRailLedColor ?? null,
+        topRailLedControl: topRailLedControl ?? null,
+        bottomRailEnabled: asBool(bottomRailEnabled),
+        bottomRailLed: asBool(bottomRailLed),
+        bottomRailLedType: bottomRailLedType ?? "CORNER_OVERLAY",
+        bottomRailLedColor: bottomRailLedColor ?? null,
+        bottomRailLedControl: bottomRailLedControl ?? null,
+        doorType: doorType ?? "HANDLE",
+        handleId: handleId ? Number(handleId) : null,
+        handleBarHeight: Number(handleBarHeight ?? 0),
+        hingeOverride: hingeOverride != null && hingeOverride !== "" ? Number(hingeOverride) : null,
+      });
+    } else {
+      bom = await computeBom(template, {
+        widthMm: Number(widthMm),
+        heightMm: Number(heightMm),
+        depthMm: Number(depthMm),
+        backType: backType ?? "OVERLAID_HDF",
+        materialMap: { corpus, back, front },
+      });
+    }
 
-    const bom = await computeBom(template, input);
-    const advice = await advise("bom_preview", { bom, input, template });
-
+    const advice = await advise("bom_preview", { bom, template });
     res.json({ bom, advice });
   } catch (err) {
     console.error("BOM preview error:", err);

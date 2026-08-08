@@ -41,8 +41,10 @@ export default function CatalogPage() {
           >
             <p className="text-lg font-semibold text-stone-900">{t.name}</p>
             <p className="mt-2 text-sm text-stone-500">
-              v{t.version} · {t.rules?.parts?.length ?? 0} dilu ·{" "}
-              {t.rules?.hardware_rules?.length ?? 0} pravidel kovani
+              v{t.version}
+              {t.rules?.engine
+                ? ` · engine ${t.rules.engine}`
+                : ` · ${t.rules?.parts?.length ?? 0} dilu · ${t.rules?.hardware_rules?.length ?? 0} pravidel kovani`}
             </p>
           </button>
         ))}
