@@ -9,7 +9,7 @@
     "db:migrate": "prisma migrate deploy",
     "db:seed": "node prisma/seed.js",
     "db:push": "prisma db push",
-    "postinstall": "prisma generate"
+    "db:generate": "prisma generate"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
