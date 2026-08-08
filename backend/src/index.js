@@ -27,7 +27,7 @@ app.use("/api/orders", ordersRoutes);
 app.get("/health", async (_req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
-    res.json({ ok: true, service: "korpus", db: true, version: "0.7.0" });
+    res.json({ ok: true, service: "korpus", db: true, version: "0.7.1" });
   } catch (err) {
     res.status(503).json({ ok: false, service: "korpus", db: false, error: String(err.message) });
   }

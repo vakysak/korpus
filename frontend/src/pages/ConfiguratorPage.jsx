@@ -406,15 +406,37 @@ export default function ConfiguratorPage() {
                 )}
               </Section>
 
-              <Section title="Typ zavirani">
+              <Section title="Otevirani dvirka">
                 {[
-                  { value: "HANDLE", label: "Uchytka" },
-                  { value: "HANDLE_BAR", label: "Lista uchytka" },
-                  { value: "TIP_ON", label: "Tip-on (bez uchytky)" },
+                  {
+                    value: "HANDLE",
+                    label: "Plny material – pant s dotahem",
+                    hint: "Nalozny pant s dotahem + uchytka",
+                  },
+                  {
+                    value: "HANDLE_BAR",
+                    label: "Plny material – pant s dotahem + lista",
+                    hint: "Nalozny pant s dotahem + lista uchytka",
+                  },
+                  {
+                    value: "TIP_ON",
+                    label: "Tip-on – pant bez dotahu",
+                    hint: "Nalozny pant bez dotahu + tip-on",
+                  },
+                  {
+                    value: "GLASS_ALU",
+                    label: "Prosklena – hlinikovy ramecek",
+                    hint: "Alu ramecek + pant s dotahem",
+                  },
+                  {
+                    value: "FLAP",
+                    label: "Vyklopna – Blum + tip-on",
+                    hint: "Plny material + Aventos vyklop + tip-on",
+                  },
                 ].map((opt) => (
                   <label
                     key={opt.value}
-                    className={`mb-2 flex cursor-pointer items-center gap-3 border px-3 py-2.5 transition ${
+                    className={`mb-2 flex cursor-pointer items-start gap-3 border px-3 py-2.5 transition ${
                       upper.doorType === opt.value
                         ? "border-[#8b5a2b] bg-[#f3ebe0]"
                         : "border-[#d6d0c4] hover:bg-white"
@@ -424,10 +446,14 @@ export default function ConfiguratorPage() {
                       type="radio"
                       name="doorType"
                       value={opt.value}
+                      className="mt-1"
                       checked={upper.doorType === opt.value}
                       onChange={() => setUpper("doorType", opt.value)}
                     />
-                    <span className="text-sm">{opt.label}</span>
+                    <span>
+                      <span className="block text-sm">{opt.label}</span>
+                      <span className="block text-xs text-stone-400">{opt.hint}</span>
+                    </span>
                   </label>
                 ))}
                 {upper.doorType === "HANDLE" && handles.length > 0 && (
@@ -462,9 +488,11 @@ export default function ConfiguratorPage() {
                 )}
               </Section>
 
+              {["HANDLE", "HANDLE_BAR", "TIP_ON", "GLASS_ALU"].includes(upper.doorType) && (
               <Section title="Panty">
                 <p className="mb-2 text-xs text-stone-400">
                   Auto: do 1 199 mm = 2 ks · od 1 200 mm = 3 ks na kridlo
+                  {upper.doorType === "TIP_ON" ? " · bez dotahu" : " · s dotahem"}
                 </p>
                 <label className="flex cursor-pointer items-center gap-2 text-sm">
                   <input
@@ -501,6 +529,7 @@ export default function ConfiguratorPage() {
                   </div>
                 )}
               </Section>
+              )}
             </>
           )}
         </div>

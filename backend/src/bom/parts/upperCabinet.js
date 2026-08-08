@@ -254,67 +254,60 @@ export async function computeUpperCabinet(input) {
     );
   }
 
-  // ── Dvirka ────────────────────────────────────────────────────────────────
-  const doorCount = W < 650 ? 1 : 2;
+  // ── Dvirka / otevirani ────────────────────────────────────────────────────
+  // HANDLE / HANDLE_BAR – plny material, pant nalozny s dotahem
+  // TIP_ON               – plny material, pant nalozny bez dotahu + tip-on
+  // GLASS_ALU            – prosklena, hlinikovy ramecek (+ pant s dotahem)
+  // FLAP                 – vyklopna, plny material + Blum vyklop + tip-on
+  const dtype = String(doorType || "HANDLE").toUpperCase();
+  const isFlap = dtype === "FLAP";
+  const isGlass = dtype === "GLASS_ALU";
+  const isTipOn = dtype === "TIP_ON";
+  const isSoftcloseSwing = dtype === "HANDLE" || dtype === "HANDLE_BAR" || isGlass;
+
+  const doorCount = isFlap ? 1 : W < 650 ? 1 : 2;
   const doorW = doorCount === 1 ? W - 0.6 : W / 2 - 0.6;
   const barH = Number(handleBarHeight) || 0;
-  const doorH = doorType === "HANDLE_BAR" ? H - 0.6 - barH : H - 0.6;
+  const doorH = dtype === "HANDLE_BAR" ? H - 0.6 - barH : H - 0.6;
 
-  parts.push(
-    makePart(
-      "dvere",
-      "FRONT",
-      doorW,
-      doorH,
-      Tf,
-      materialFront,
-      frontPrice,
-      doorCount,
-      { front: true, back: true, left: true, right: true },
-      "hrana kolem dokola",
-    ),
-  );
-
-  const autoHingePerDoor = doorH < 1200 ? 2 : 3;
-  const hingePerDoor = hingeOverride != null ? Number(hingeOverride) : autoHingePerDoor;
-  const hingeCount = hingePerDoor * doorCount;
-
-  const hinge = await prisma.hardware.findFirst({
-    where: { type: "HINGE", inStock: true, active: true },
-    orderBy: { supplier: { priority: "asc" } },
-  });
-  const hingePrice = await getHardwarePrice(hinge?.id);
-  if (!hinge) warnings.push("Chybi pant v DB (typ HINGE)");
-  hardware.push({
-    ...makeHardware("pant", hinge, hingeCount, hingePrice),
-    autoCount: autoHingePerDoor * doorCount,
-    perDoor: hingePerDoor,
-    doorCount,
-  });
-
-  if (doorType === "HANDLE" && handleId) {
-    const handle = await prisma.hardware.findUnique({ where: { id: Number(handleId) } });
-    const handlePrice = await getHardwarePrice(handle?.id);
-    if (!handle) warnings.push("Chybi vybrana uchytka");
-    else hardware.push(makeHardware("uchytka", handle, doorCount, handlePrice));
+  if (isGlass) {
+    // Sklo v alu ramecku – panel skla (FRONT material jako stub) + ramecek
+    parts.push(
+      makePart(
+        "sklo_dvere",
+        "FRONT",
+        doorW,
+        doorH,
+        Tf,
+        materialFront,
+        frontPrice,
+        doorCount,
+        {},
+        "prosklena vydro / stub materialu frontu",
+      ),
+    );
+    const aluFrame = await findHardwareByName(["ramecek", "alu", "hlinik"]);
+    const aluPrice = await getHardwarePrice(aluFrame?.id);
+    if (!aluFrame) warnings.push("Chybi hlinikovy ramecek v DB");
+    hardware.push(makeHardware("hlinikovy_ramecek", aluFrame, doorCount, aluPrice, "prosklena dvirka"));
+  } else {
+    parts.push(
+      makePart(
+        "dvere",
+        "FRONT",
+        doorW,
+        doorH,
+        Tf,
+        materialFront,
+        frontPrice,
+        doorCount,
+        { front: true, back: true, left: true, right: true },
+        isFlap ? "vyklopna – hrana kolem dokola" : "hrana kolem dokola",
+      ),
+    );
   }
 
-  if (doorType === "TIP_ON") {
-    const tipOn = await prisma.hardware.findFirst({
-      where: {
-        type: "OTHER",
-        name: { contains: "tip", mode: "insensitive" },
-        inStock: true,
-        active: true,
-      },
-      orderBy: { supplier: { priority: "asc" } },
-    });
-    const tipOnPrice = await getHardwarePrice(tipOn?.id);
-    if (!tipOn) warnings.push("Chybi tip-on v DB");
-    hardware.push(makeHardware("tip_on", tipOn, doorCount, tipOnPrice));
-  }
-
-  if (doorType === "HANDLE_BAR" && barH > 0) {
+  if (dtype === "HANDLE_BAR" && barH > 0) {
     parts.push(
       makePart(
         "lista_uchytka",
@@ -329,6 +322,60 @@ export async function computeUpperCabinet(input) {
         "lista uchytka – hrana kolem dokola",
       ),
     );
+  }
+
+  // Panty / vyklopy
+  const autoHingePerDoor = doorH < 1200 ? 2 : 3;
+  let hingeCount = 0;
+  let autoHingeCount = 0;
+
+  if (isFlap) {
+    const flap = await findHardwareByName(["aventos", "vyklop", "flap", "hk-"]);
+    const flapPrice = await getHardwarePrice(flap?.id);
+    if (!flap) warnings.push("Chybi Blum vyklop (Aventos) v DB");
+    hardware.push(makeHardware("vyklop_blum", flap, 1, flapPrice, "vyklopna dvirka"));
+  } else if (isSoftcloseSwing || isTipOn) {
+    const softclose = isSoftcloseSwing;
+    const hinge = softclose
+      ? await findHinge({ softclose: true })
+      : await findHinge({ softclose: false });
+    const hingePerDoor = hingeOverride != null ? Number(hingeOverride) : autoHingePerDoor;
+    hingeCount = hingePerDoor * doorCount;
+    autoHingeCount = autoHingePerDoor * doorCount;
+    const hingePrice = await getHardwarePrice(hinge?.id);
+    if (!hinge) {
+      warnings.push(
+        softclose
+          ? "Chybi pant nalozny s dotahem v DB"
+          : "Chybi pant nalozny bez dotahu v DB",
+      );
+    }
+    hardware.push({
+      ...makeHardware(
+        softclose ? "pant_s_dotahem" : "pant_bez_dotahu",
+        hinge,
+        hingeCount,
+        hingePrice,
+        softclose ? "nalozny s dotahem" : "nalozny bez dotahu",
+      ),
+      autoCount: autoHingeCount,
+      perDoor: hingePerDoor,
+      doorCount,
+    });
+  }
+
+  if (dtype === "HANDLE" && handleId) {
+    const handle = await prisma.hardware.findUnique({ where: { id: Number(handleId) } });
+    const handlePrice = await getHardwarePrice(handle?.id);
+    if (!handle) warnings.push("Chybi vybrana uchytka");
+    else hardware.push(makeHardware("uchytka", handle, doorCount, handlePrice));
+  }
+
+  if (isTipOn || isFlap) {
+    const tipOnHw = await findHardwareByName(["tip-on", "tip on", "tipon"]);
+    const tipOnPrice = await getHardwarePrice(tipOnHw?.id);
+    if (!tipOnHw) warnings.push("Chybi tip-on v DB");
+    hardware.push(makeHardware("tip_on", tipOnHw, doorCount, tipOnPrice));
   }
 
   // ── Pohledovy bok ─────────────────────────────────────────────────────────
@@ -454,23 +501,64 @@ export async function computeUpperCabinet(input) {
     meta: {
       doorCount,
       hingeCount,
-      autoHingeCount: autoHingePerDoor * doorCount,
+      autoHingeCount,
       visibleSideCount,
       backType,
-      doorType,
+      doorType: dtype,
       shelfCount: shelves,
+      opening: isFlap
+        ? "vyklopna"
+        : isGlass
+          ? "prosklena_alu"
+          : isTipOn
+            ? "tip_on_bez_dotahu"
+            : "pant_s_dotahem",
     },
   };
 }
 
-async function findLedStrip() {
-  return prisma.hardware.findFirst({
-    where: {
-      type: "OTHER",
-      name: { contains: "led", mode: "insensitive" },
-      inStock: true,
-      active: true,
-    },
+async function findHardwareByName(needles) {
+  const all = await prisma.hardware.findMany({
+    where: { inStock: true, active: true },
     orderBy: { supplier: { priority: "asc" } },
   });
+  const lowerNeedles = needles.map((n) => n.toLowerCase());
+  return (
+    all.find((h) => {
+      const name = h.name.toLowerCase();
+      return lowerNeedles.some((n) => name.includes(n));
+    }) ?? null
+  );
+}
+
+async function findHinge({ softclose }) {
+  const hinges = await prisma.hardware.findMany({
+    where: { type: "HINGE", inStock: true, active: true },
+    orderBy: { supplier: { priority: "asc" } },
+  });
+  if (softclose) {
+    return (
+      hinges.find((h) => {
+        const n = h.name.toLowerCase();
+        return n.includes("dotah") || n.includes("soft") || n.includes("blumotion") || n.includes("clip top");
+      }) ??
+      hinges[0] ??
+      null
+    );
+  }
+  return (
+    hinges.find((h) => {
+      const n = h.name.toLowerCase();
+      return n.includes("bez dotahu") || n.includes("bez-dotahu") || n.includes("spring");
+    }) ??
+    hinges.find((h) => {
+      const n = h.name.toLowerCase();
+      return !n.includes("dotah") && !n.includes("soft") && !n.includes("blumotion");
+    }) ??
+    null
+  );
+}
+
+async function findLedStrip() {
+  return findHardwareByName(["led pasek", "led strip", "led "]);
 }

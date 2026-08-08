@@ -213,6 +213,8 @@ enum DoorType {
   HANDLE
   HANDLE_BAR
   TIP_ON
+  GLASS_ALU
+  FLAP
   NONE
 }
 

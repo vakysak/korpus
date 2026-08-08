@@ -93,11 +93,36 @@ async function main() {
 
   const hinge = await prisma.hardware.upsert({
     where: { supplierId_supplierCode: { supplierId: blum.id, supplierCode: "BLUM-71B3590" } },
-    update: { name: "Blum Clip Top pant 110", type: "HINGE", packQty: 1, inStock: true, active: true },
+    update: {
+      name: "Pant nalozny s dotahem Blum Clip Top 110",
+      type: "HINGE",
+      packQty: 1,
+      inStock: true,
+      active: true,
+    },
     create: {
       supplierId: blum.id,
       supplierCode: "BLUM-71B3590",
-      name: "Blum Clip Top pant 110",
+      name: "Pant nalozny s dotahem Blum Clip Top 110",
+      type: "HINGE",
+      packQty: 1,
+      inStock: true,
+    },
+  });
+
+  const hingeNoSoft = await prisma.hardware.upsert({
+    where: { supplierId_supplierCode: { supplierId: blum.id, supplierCode: "BLUM-71B3550" } },
+    update: {
+      name: "Pant nalozny bez dotahu Blum 110",
+      type: "HINGE",
+      packQty: 1,
+      inStock: true,
+      active: true,
+    },
+    create: {
+      supplierId: blum.id,
+      supplierCode: "BLUM-71B3550",
+      name: "Pant nalozny bez dotahu Blum 110",
       type: "HINGE",
       packQty: 1,
       inStock: true,
@@ -143,6 +168,44 @@ async function main() {
     },
   });
 
+  const aluFrame = await prisma.hardware.upsert({
+    where: { supplierId_supplierCode: { supplierId: blum.id, supplierCode: "ALU-FRAME-DOOR" } },
+    update: {
+      name: "Hlinikovy ramecek prosklena dvirka",
+      type: "OTHER",
+      packQty: 1,
+      inStock: true,
+      active: true,
+    },
+    create: {
+      supplierId: blum.id,
+      supplierCode: "ALU-FRAME-DOOR",
+      name: "Hlinikovy ramecek prosklena dvirka",
+      type: "OTHER",
+      packQty: 1,
+      inStock: true,
+    },
+  });
+
+  const aventos = await prisma.hardware.upsert({
+    where: { supplierId_supplierCode: { supplierId: blum.id, supplierCode: "BLUM-AVENTOS-HK" } },
+    update: {
+      name: "Blum Aventos HK vyklop",
+      type: "OTHER",
+      packQty: 1,
+      inStock: true,
+      active: true,
+    },
+    create: {
+      supplierId: blum.id,
+      supplierCode: "BLUM-AVENTOS-HK",
+      name: "Blum Aventos HK vyklop",
+      type: "OTHER",
+      packQty: 1,
+      inStock: true,
+    },
+  });
+
   await prisma.priceListItem.updateMany({
     where: { hardwareId: hinge.id, validTo: null },
     data: { validTo: now },
@@ -152,9 +215,12 @@ async function main() {
   });
 
   for (const [hwId, price, unit] of [
+    [hingeNoSoft.id, 32, "PC"],
     [tipOn.id, 38, "PC"],
     [handle.id, 55, "PC"],
     [led.id, 120, "BM"],
+    [aluFrame.id, 890, "PC"],
+    [aventos.id, 1850, "PC"],
   ]) {
     await prisma.priceListItem.updateMany({
       where: { hardwareId: hwId, validTo: null },
@@ -256,7 +322,15 @@ async function main() {
   console.log("Seed OK", {
     suppliers: ["DEMOS", "TRUST", "EGGER", "BLUM", "HETTICH"],
     materials: [corpus.supplierCode, back.supplierCode, front.supplierCode],
-    hardware: [hinge.supplierCode, tipOn.supplierCode, handle.supplierCode, led.supplierCode],
+    hardware: [
+      hinge.supplierCode,
+      hingeNoSoft.supplierCode,
+      tipOn.supplierCode,
+      handle.supplierCode,
+      led.supplierCode,
+      aluFrame.supplierCode,
+      aventos.supplierCode,
+    ],
     templates: templateDefs.map((t) => t.name),
   });
 }
